@@ -1,11 +1,30 @@
 import { supabase, supabaseConfigured } from "./supabase";
 
-function asPayload(chess) {
+function asPayload(gameState) {
+  if (typeof gameState?.fen === "function") {
+    // Backward compatibility for old 2-player chess.js flow.
+    return {
+      fen: gameState.fen(),
+      pgn: gameState.pgn(),
+      turn: gameState.turn(),
+      status: gameState.isGameOver() ? "finished" : "active",
+      updated_at: new Date().toISOString(),
+    };
+  }
+
   return {
-    fen: chess.fen(),
-    pgn: chess.pgn(),
-    turn: chess.turn(),
-    status: chess.isGameOver() ? "finished" : "active",
+    fen: JSON.stringify({
+      version: 1,
+      board: gameState.board,
+    }),
+    pgn: JSON.stringify({
+      turn: gameState.turn,
+      moveCount: gameState.moveCount,
+      capturesBy: gameState.capturesBy,
+      winner: gameState.winner,
+    }),
+    turn: gameState.turn,
+    status: gameState.winner ? "finished" : "active",
     updated_at: new Date().toISOString(),
   };
 }
@@ -18,10 +37,37 @@ function assertConfigured() {
   }
 }
 
-export async function createRemoteGame(chess) {
+async function ensureAuthenticatedUserId() {
   assertConfigured();
+
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    throw new Error(`Session Supabase invalide: ${sessionError.message}`);
+  }
+
+  const existingUserId = sessionData?.session?.user?.id;
+  if (existingUserId) {
+    return existingUserId;
+  }
+
+  const { data, error } = await supabase.auth.signInAnonymously();
+  if (error) {
+    throw new Error(`Connexion anonyme impossible: ${error.message}`);
+  }
+
+  const userId = data?.user?.id ?? data?.session?.user?.id;
+  if (!userId) {
+    throw new Error("Connexion anonyme réussie mais utilisateur introuvable.");
+  }
+
+  return userId;
+}
+
+export async function createRemoteGame(gameState) {
+  const userId = await ensureAuthenticatedUserId();
   const payload = {
-    ...asPayload(chess),
+    ...asPayload(gameState),
+    owner_id: userId,
     created_at: new Date().toISOString(),
   };
 
@@ -37,12 +83,13 @@ export async function createRemoteGame(chess) {
   return data;
 }
 
-export async function syncRemoteGame(gameId, chess) {
-  assertConfigured();
+export async function syncRemoteGame(gameId, gameState) {
+  const userId = await ensureAuthenticatedUserId();
   const { error } = await supabase
     .from("chess_games")
-    .update(asPayload(chess))
-    .eq("id", gameId);
+    .update(asPayload(gameState))
+    .eq("id", gameId)
+    .eq("owner_id", userId);
 
   if (error) {
     throw new Error(`Synchronisation impossible: ${error.message}`);

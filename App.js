@@ -1,6 +1,7 @@
 import { StatusBar } from "expo-status-bar";
 import { useMemo, useState } from "react";
 import {
+    Alert,
     Pressable,
     SafeAreaView,
     StyleSheet,
@@ -12,6 +13,11 @@ import { BOARD_SIZE, PLAYER_COLOR, PLAYER_LABEL, PIECE_SYMBOL } from "./src/game
 import { buildCells, createInitialBoard, keyOf } from "./src/game/board.js";
 import { applyMove, createCapturesBy } from "./src/game/engine.js";
 import { computeStats } from "./src/game/stats.js";
+import {
+    createRemoteGame,
+    supabaseConfigured,
+    syncRemoteGame,
+} from "./src/lib/gameApi.js";
 
 function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
@@ -26,6 +32,8 @@ export default function App() {
     const [capturesBy, setCapturesBy] = useState({
         ...createCapturesBy(),
     });
+    const [remoteGameId, setRemoteGameId] = useState(null);
+    const [syncMessage, setSyncMessage] = useState("Remote: non synchronisé");
 
     const shortSide = Math.min(width, height);
     const sidebarWidth = clamp(Math.floor(width * 0.2), 120, 240);
@@ -114,6 +122,42 @@ export default function App() {
         setSelected(null);
         setMoveCount(0);
         setCapturesBy(createCapturesBy());
+        setSyncMessage("Remote: partie réinitialisée localement");
+    };
+
+    const onCreateRemote = async () => {
+        try {
+            const result = await createRemoteGame({
+                board,
+                turn,
+                moveCount,
+                capturesBy,
+                winner,
+            });
+            setRemoteGameId(result.id);
+            setSyncMessage(`Remote: partie créée (${result.id.slice(0, 8)}...)`);
+        } catch (error) {
+            Alert.alert("Supabase", error.message);
+        }
+    };
+
+    const onSyncRemote = async () => {
+        if (!remoteGameId) {
+            Alert.alert("Supabase", "Crée d'abord une partie distante.");
+            return;
+        }
+        try {
+            await syncRemoteGame(remoteGameId, {
+                board,
+                turn,
+                moveCount,
+                capturesBy,
+                winner,
+            });
+            setSyncMessage("Remote: synchronisation réussie");
+        } catch (error) {
+            Alert.alert("Supabase", error.message);
+        }
     };
 
     const whiteStats = stats.find((s) => s.player === "white");
@@ -192,6 +236,80 @@ export default function App() {
                                 Nouvelle partie
                             </Text>
                         </Pressable>
+
+                        <Pressable
+                            style={[
+                                styles.menuButtonSecondary,
+                                {
+                                    marginTop: lineSpacing,
+                                    paddingVertical: resetButtonVerticalPadding,
+                                    paddingHorizontal: resetButtonHorizontalPadding,
+                                    borderRadius: clamp(Math.floor(panelRadius * 0.7), 5, 10),
+                                },
+                            ]}
+                            onPress={onCreateRemote}
+                            disabled={!supabaseConfigured}
+                        >
+                            <Text
+                                style={[
+                                    styles.resetText,
+                                    { fontSize: buttonFontSize },
+                                ]}
+                            >
+                                Créer remote
+                            </Text>
+                        </Pressable>
+
+                        <Pressable
+                            style={[
+                                styles.menuButtonSecondary,
+                                {
+                                    marginTop: lineSpacing,
+                                    paddingVertical: resetButtonVerticalPadding,
+                                    paddingHorizontal: resetButtonHorizontalPadding,
+                                    borderRadius: clamp(Math.floor(panelRadius * 0.7), 5, 10),
+                                    opacity: supabaseConfigured ? 1 : 0.5,
+                                },
+                            ]}
+                            onPress={onSyncRemote}
+                            disabled={!supabaseConfigured}
+                        >
+                            <Text
+                                style={[
+                                    styles.resetText,
+                                    { fontSize: buttonFontSize },
+                                ]}
+                            >
+                                Synchroniser
+                            </Text>
+                        </Pressable>
+
+                        <Text
+                            style={[
+                                styles.cornerSub,
+                                { fontSize: subFontSize, marginTop: lineSpacing * 2 },
+                            ]}
+                        >
+                            {syncMessage}
+                        </Text>
+                        <Text
+                            style={[
+                                styles.cornerSub,
+                                { fontSize: subFontSize, marginTop: lineSpacing },
+                            ]}
+                        >
+                            Game ID: {remoteGameId ?? "aucun"}
+                        </Text>
+                        {!supabaseConfigured ? (
+                            <Text
+                                style={[
+                                    styles.cornerSub,
+                                    { fontSize: subFontSize, marginTop: lineSpacing, color: "#fca5a5" },
+                                ]}
+                            >
+                                Supabase non configuré (.env requis)
+                            </Text>
+                        ) : null}
                     </View>
                 </View>
 
@@ -578,6 +696,9 @@ const styles = StyleSheet.create({
     },
     resetButton: {
         backgroundColor: "#2563eb",
+    },
+    menuButtonSecondary: {
+        backgroundColor: "#374151",
     },
     resetText: {
         color: "#fff",

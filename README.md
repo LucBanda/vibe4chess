@@ -26,9 +26,18 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=...
 ## Configuration Supabase
 
 1. Créez un projet Supabase
-2. Ouvrez SQL Editor
-3. Exécutez le script [`supabase/schema.sql`](supabase/schema.sql)
-4. Relancez l'app Expo
+2. Activez `Anonymous sign-ins` dans Authentication > Providers > Anonymous
+3. Ouvrez SQL Editor
+4. Exécutez le script [`supabase/schema.sql`](supabase/schema.sql)
+5. Relancez l'app Expo
+
+## Sécurité Supabase (important)
+
+- La clé `EXPO_PUBLIC_SUPABASE_ANON_KEY` est publique par design et peut être exposée côté client.
+- Ne mettez jamais la clé `service_role` dans le frontend.
+- Les accès DB sont protégés par RLS dans `supabase/schema.sql`:
+  - lecture/écriture limitées au propriétaire (`owner_id = auth.uid()`)
+  - insertion/mise à jour autorisées uniquement pour un utilisateur authentifié (anonyme inclus)
 
 ## Fonctionnalités incluses
 
