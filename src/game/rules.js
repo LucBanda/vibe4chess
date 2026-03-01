@@ -18,12 +18,17 @@ function isPathClear(board, fromX, fromY, toX, toY) {
   return true;
 }
 
+function pawnBaseColor(piece) {
+  return piece.origin ?? piece.player;
+}
+
 function isPawnStart(piece, x, y) {
+  const baseColor = pawnBaseColor(piece);
   return (
-    (piece.player === "white" && y === 12) ||
-    (piece.player === "black" && y === 1) ||
-    (piece.player === "red" && x === 1) ||
-    (piece.player === "blue" && x === 12)
+    (baseColor === "white" && y === 12) ||
+    (baseColor === "black" && y === 1) ||
+    (baseColor === "red" && x === 1) ||
+    (baseColor === "blue" && x === 12)
   );
 }
 
@@ -63,9 +68,10 @@ export function shouldPromote(piece, x, y) {
   if (piece.type !== "pawn") {
     return false;
   }
-  if (piece.player === "white") return y === 0;
-  if (piece.player === "black") return y === 13;
-  if (piece.player === "red") return x === 13;
+  const baseColor = pawnBaseColor(piece);
+  if (baseColor === "white") return y === 0;
+  if (baseColor === "black") return y === 13;
+  if (baseColor === "red") return x === 13;
   return x === 0;
 }
 
@@ -108,7 +114,7 @@ export function isLegalMove(board, fromX, fromY, toX, toY, piece) {
   }
 
   if (piece.type === "pawn") {
-    const dir = pawnDirection(piece.player);
+    const dir = pawnDirection(pawnBaseColor(piece));
     const oneStepX = fromX + dir.dx;
     const oneStepY = fromY + dir.dy;
 
@@ -130,7 +136,7 @@ export function isLegalMove(board, fromX, fromY, toX, toY, piece) {
       return true;
     }
 
-    const captures = pawnCaptureOffsets(piece.player);
+    const captures = pawnCaptureOffsets(pawnBaseColor(piece));
     return captures.some(({ dx: capX, dy: capY }) => {
       return toX === fromX + capX && toY === fromY + capY && Boolean(target);
     });

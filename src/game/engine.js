@@ -50,6 +50,20 @@ export function applyMove(state, fromX, fromY, toX, toY) {
     ? { ...movingPiece, type: "queen" }
     : movingPiece;
 
+  // If a king is captured, the victor absorbs all remaining pieces
+  // of the defeated player.
+  if (target?.type === "king") {
+    Object.entries(nextBoard).forEach(([square, piece]) => {
+      if (piece.player === target.player) {
+        nextBoard[square] = {
+          ...piece,
+          player: state.turn,
+          origin: piece.origin ?? piece.player,
+        };
+      }
+    });
+  }
+
   const nextCapturesBy = { ...state.capturesBy };
   if (target) {
     nextCapturesBy[state.turn] += 1;

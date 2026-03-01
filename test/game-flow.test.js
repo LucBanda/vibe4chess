@@ -88,3 +88,47 @@ test("winner is set when last opponent king is captured", () => {
   assert.equal(result.ok, true);
   assert.equal(result.state.winner, "white");
 });
+
+test("capturing a king transfers defeated player's remaining pieces", () => {
+  const initial = makeState({
+    [keyOf(4, 4)]: { player: "white", type: "rook" },
+    [keyOf(5, 5)]: { player: "white", type: "king" },
+    [keyOf(4, 6)]: { player: "red", type: "king" },
+    [keyOf(7, 6)]: { player: "red", type: "queen" },
+    [keyOf(9, 9)]: { player: "black", type: "king" },
+    [keyOf(11, 11)]: { player: "blue", type: "king" },
+  });
+
+  const result = applyMove(initial, 4, 4, 4, 6);
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.state.board[keyOf(7, 6)], {
+    player: "white",
+    type: "queen",
+    origin: "red",
+  });
+  assert.equal(result.state.capturesBy.white, 1);
+});
+
+test("a transferred pawn remains playable with its original orientation", () => {
+  const initial = makeState({
+    [keyOf(4, 4)]: { player: "white", type: "rook" },
+    [keyOf(5, 5)]: { player: "white", type: "king" },
+    [keyOf(4, 6)]: { player: "red", type: "king" },
+    [keyOf(7, 6)]: { player: "red", type: "pawn" },
+    [keyOf(9, 9)]: { player: "black", type: "king" },
+    [keyOf(11, 11)]: { player: "blue", type: "king" },
+  });
+
+  const afterCapture = applyMove(initial, 4, 4, 4, 6).state;
+  const afterBlack = applyMove(afterCapture, 9, 9, 9, 8).state;
+  const afterBlue = applyMove(afterBlack, 11, 11, 11, 10).state;
+  const playTransferredPawn = applyMove(afterBlue, 7, 6, 8, 6);
+
+  assert.equal(playTransferredPawn.ok, true);
+  assert.deepEqual(playTransferredPawn.state.board[keyOf(8, 6)], {
+    player: "white",
+    type: "pawn",
+    origin: "red",
+  });
+});
