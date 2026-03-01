@@ -1,304 +1,859 @@
 import { StatusBar } from "expo-status-bar";
-import { Chess } from "chess.js";
 import { useMemo, useState } from "react";
 import {
-  Alert,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
+    Pressable,
+    SafeAreaView,
+    StyleSheet,
+    Text,
+    useWindowDimensions,
+    View,
 } from "react-native";
-import {
-  createRemoteGame,
-  syncRemoteGame,
-  supabaseConfigured,
-} from "./src/lib/gameApi";
 
-const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
-const RANKS = [8, 7, 6, 5, 4, 3, 2, 1];
+const BOARD_SIZE = 14;
+const PLAYERS = ["white", "red", "black", "blue"];
 
-const PIECE_SYMBOLS = {
-  wp: "♙",
-  wr: "♖",
-  wn: "♘",
-  wb: "♗",
-  wq: "♕",
-  wk: "♔",
-  bp: "♟",
-  br: "♜",
-  bn: "♞",
-  bb: "♝",
-  bq: "♛",
-  bk: "♚",
+const PLAYER_LABEL = {
+    white: "Blanc",
+    red: "Rouge",
+    black: "Noir",
+    blue: "Bleu",
 };
 
-function buildSquares(chess) {
-  return RANKS.flatMap((rank, rankIndex) =>
-    FILES.map((file, fileIndex) => {
-      const square = `${file}${rank}`;
-      const piece = chess.get(square);
-      return {
-        square,
-        isLight: (rankIndex + fileIndex) % 2 === 0,
-        piece,
-      };
-    }),
-  );
+const PLAYER_COLOR = {
+    white: "#f8fafc",
+    red: "#ef4444",
+    black: "#111827",
+    blue: "#3b82f6",
+};
+
+const PIECE_SYMBOL = {
+    king: "♚",
+    queen: "♛",
+    rook: "♜",
+    bishop: "♝",
+    knight: "♞",
+    pawn: "♟",
+};
+
+const BACK_RANK = [
+    "rook",
+    "knight",
+    "bishop",
+    "queen",
+    "king",
+    "bishop",
+    "knight",
+    "rook",
+];
+
+function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
 }
 
-function pieceToSymbol(piece) {
-  if (!piece) {
-    return "";
-  }
-  return PIECE_SYMBOLS[`${piece.color}${piece.type}`] ?? "";
+function isPlayable(x, y) {
+    if (x < 0 || y < 0 || x >= BOARD_SIZE || y >= BOARD_SIZE) {
+        return false;
+    }
+    const inTopLeft = x < 3 && y < 3;
+    const inTopRight = x > 10 && y < 3;
+    const inBottomLeft = x < 3 && y > 10;
+    const inBottomRight = x > 10 && y > 10;
+    return !(inTopLeft || inTopRight || inBottomLeft || inBottomRight);
+}
+
+function keyOf(x, y) {
+    return `${x},${y}`;
+}
+
+function createInitialBoard() {
+    const board = {};
+
+    for (let i = 0; i < 8; i += 1) {
+        const x = i + 3;
+        board[keyOf(x, 13)] = { player: "white", type: BACK_RANK[i] };
+        board[keyOf(x, 12)] = { player: "white", type: "pawn" };
+
+        board[keyOf(x, 0)] = { player: "black", type: BACK_RANK[i] };
+        board[keyOf(x, 1)] = { player: "black", type: "pawn" };
+    }
+
+    for (let i = 0; i < 8; i += 1) {
+        const y = i + 3;
+        board[keyOf(0, y)] = { player: "red", type: BACK_RANK[i] };
+        board[keyOf(1, y)] = { player: "red", type: "pawn" };
+
+        board[keyOf(13, y)] = { player: "blue", type: BACK_RANK[i] };
+        board[keyOf(12, y)] = { player: "blue", type: "pawn" };
+    }
+
+    return board;
+}
+
+function isPathClear(board, fromX, fromY, toX, toY) {
+    const stepX = Math.sign(toX - fromX);
+    const stepY = Math.sign(toY - fromY);
+    let x = fromX + stepX;
+    let y = fromY + stepY;
+
+    while (x !== toX || y !== toY) {
+        if (board[keyOf(x, y)]) {
+            return false;
+        }
+        x += stepX;
+        y += stepY;
+    }
+
+    return true;
+}
+
+function isPawnStart(piece, x, y) {
+    return (
+        (piece.player === "white" && y === 12) ||
+        (piece.player === "black" && y === 1) ||
+        (piece.player === "red" && x === 1) ||
+        (piece.player === "blue" && x === 12)
+    );
+}
+
+function pawnDirection(player) {
+    if (player === "white") return { dx: 0, dy: -1 };
+    if (player === "black") return { dx: 0, dy: 1 };
+    if (player === "red") return { dx: 1, dy: 0 };
+    return { dx: -1, dy: 0 };
+}
+
+function pawnCaptureOffsets(player) {
+    if (player === "white")
+        return [
+            { dx: -1, dy: -1 },
+            { dx: 1, dy: -1 },
+        ];
+    if (player === "black")
+        return [
+            { dx: -1, dy: 1 },
+            { dx: 1, dy: 1 },
+        ];
+    if (player === "red")
+        return [
+            { dx: 1, dy: -1 },
+            { dx: 1, dy: 1 },
+        ];
+    return [
+        { dx: -1, dy: -1 },
+        { dx: -1, dy: 1 },
+    ];
+}
+
+function shouldPromote(piece, x, y) {
+    if (piece.type !== "pawn") {
+        return false;
+    }
+    if (piece.player === "white") return y === 0;
+    if (piece.player === "black") return y === 13;
+    if (piece.player === "red") return x === 13;
+    return x === 0;
+}
+
+function isLegalMove(board, fromX, fromY, toX, toY, piece) {
+    if (!isPlayable(toX, toY) || (fromX === toX && fromY === toY)) {
+        return false;
+    }
+
+    const target = board[keyOf(toX, toY)];
+    if (target && target.player === piece.player) {
+        return false;
+    }
+
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+
+    if (piece.type === "knight") {
+        return (absX === 1 && absY === 2) || (absX === 2 && absY === 1);
+    }
+
+    if (piece.type === "bishop") {
+        return absX === absY && isPathClear(board, fromX, fromY, toX, toY);
+    }
+
+    if (piece.type === "rook") {
+        const sameFileOrRank = dx === 0 || dy === 0;
+        return sameFileOrRank && isPathClear(board, fromX, fromY, toX, toY);
+    }
+
+    if (piece.type === "queen") {
+        const straight = dx === 0 || dy === 0;
+        const diagonal = absX === absY;
+        return (
+            (straight || diagonal) && isPathClear(board, fromX, fromY, toX, toY)
+        );
+    }
+
+    if (piece.type === "king") {
+        return absX <= 1 && absY <= 1;
+    }
+
+    if (piece.type === "pawn") {
+        const dir = pawnDirection(piece.player);
+        const oneStepX = fromX + dir.dx;
+        const oneStepY = fromY + dir.dy;
+
+        if (toX === oneStepX && toY === oneStepY && !target) {
+            return true;
+        }
+
+        const twoStepX = fromX + dir.dx * 2;
+        const twoStepY = fromY + dir.dy * 2;
+        const middleSquare = board[keyOf(oneStepX, oneStepY)];
+
+        if (
+            isPawnStart(piece, fromX, fromY) &&
+            toX === twoStepX &&
+            toY === twoStepY &&
+            !target &&
+            !middleSquare
+        ) {
+            return true;
+        }
+
+        const captures = pawnCaptureOffsets(piece.player);
+        return captures.some(({ dx: capX, dy: capY }) => {
+            return (
+                toX === fromX + capX && toY === fromY + capY && Boolean(target)
+            );
+        });
+    }
+
+    return false;
+}
+
+function getNextAlivePlayer(current, alivePlayers) {
+    const currentIndex = PLAYERS.indexOf(current);
+    for (let i = 1; i <= PLAYERS.length; i += 1) {
+        const player = PLAYERS[(currentIndex + i) % PLAYERS.length];
+        if (alivePlayers.includes(player)) {
+            return player;
+        }
+    }
+    return current;
+}
+
+function buildCells(board) {
+    const cells = [];
+    for (let y = 0; y < BOARD_SIZE; y += 1) {
+        for (let x = 0; x < BOARD_SIZE; x += 1) {
+            cells.push({
+                x,
+                y,
+                playable: isPlayable(x, y),
+                piece: board[keyOf(x, y)] ?? null,
+                isLight: (x + y) % 2 === 0,
+            });
+        }
+    }
+    return cells;
+}
+
+function computeStats(board, capturesBy) {
+    const pieceCount = { white: 0, red: 0, black: 0, blue: 0 };
+    const kingAlive = { white: false, red: false, black: false, blue: false };
+
+    Object.values(board).forEach((piece) => {
+        pieceCount[piece.player] += 1;
+        if (piece.type === "king") {
+            kingAlive[piece.player] = true;
+        }
+    });
+
+    return PLAYERS.map((player) => ({
+        player,
+        pieces: pieceCount[player],
+        captures: capturesBy[player],
+        alive: kingAlive[player],
+    }));
 }
 
 export default function App() {
-  const [chess, setChess] = useState(() => new Chess());
-  const [selectedSquare, setSelectedSquare] = useState(null);
-  const [remoteGameId, setRemoteGameId] = useState(null);
-  const [syncMessage, setSyncMessage] = useState("Non synchronisée");
-  const { width } = useWindowDimensions();
-
-  const boardBorderWidth = 2;
-  const maxBoardSize = Math.min(width - 24, 520);
-  const squareSize = Math.floor(maxBoardSize / 8);
-  const boardSize = squareSize * 8;
-  const squares = useMemo(() => buildSquares(chess), [chess]);
-  const history = useMemo(() => chess.history(), [chess]);
-  const currentTurn = chess.turn() === "w" ? "Blancs" : "Noirs";
-  const gameOver = chess.isGameOver();
-
-  const selectOrMove = (square) => {
-    if (!selectedSquare) {
-      const target = chess.get(square);
-      if (!target || target.color !== chess.turn()) {
-        return;
-      }
-      setSelectedSquare(square);
-      return;
-    }
-
-    if (selectedSquare === square) {
-      setSelectedSquare(null);
-      return;
-    }
-
-    const next = new Chess(chess.fen());
-    const move = next.move({
-      from: selectedSquare,
-      to: square,
-      promotion: "q",
+    const { width, height } = useWindowDimensions();
+    const [board, setBoard] = useState(() => createInitialBoard());
+    const [turn, setTurn] = useState("white");
+    const [selected, setSelected] = useState(null);
+    const [moveCount, setMoveCount] = useState(0);
+    const [capturesBy, setCapturesBy] = useState({
+        white: 0,
+        red: 0,
+        black: 0,
+        blue: 0,
     });
 
-    if (!move) {
-      const target = chess.get(square);
-      if (target && target.color === chess.turn()) {
-        setSelectedSquare(square);
-      }
-      return;
-    }
+    const shortSide = Math.min(width, height);
+    const sidebarWidth = clamp(Math.floor(width * 0.2), 120, 240);
+    const stageWidth = Math.max(width - sidebarWidth, 220);
+    const boardPixelSize = Math.floor(Math.min(width, height) - 12);
+    const renderedBoardSize = Math.floor(
+        clamp(Math.min(stageWidth * 0.84, height * 0.76, boardPixelSize), 196, 900),
+    );
+    const squareSize = Math.floor(renderedBoardSize / BOARD_SIZE);
+    const boardSize = squareSize * BOARD_SIZE;
+    const menuShortSide = Math.min(sidebarWidth, height);
 
-    setChess(next);
-    setSelectedSquare(null);
-  };
+    const panelHorizontalPadding = clamp(Math.floor(shortSide * 0.018), 10, 18);
+    const panelVerticalPadding = clamp(Math.floor(shortSide * 0.016), 8, 16);
+    const panelRadius = clamp(Math.floor(shortSide * 0.02), 8, 14);
 
-  const resetGame = () => {
-    setChess(new Chess());
-    setSelectedSquare(null);
-    setSyncMessage("Partie réinitialisée (local)");
-  };
+    const titleFontSize = clamp(Math.floor(shortSide * 0.027), 12, 18);
+    const valueFontSize = clamp(Math.floor(shortSide * 0.032), 14, 21);
+    const subFontSize = clamp(Math.floor(shortSide * 0.022), 11, 15);
+    const buttonFontSize = clamp(Math.floor(menuShortSide * 0.1), 10, 14);
+    const pieceFontSize = clamp(Math.floor(squareSize * 0.72), 12, 40);
 
-  const onCreateRemote = async () => {
-    try {
-      const result = await createRemoteGame(chess);
-      setRemoteGameId(result.id);
-      setSyncMessage(`Partie distante créée (${result.id.slice(0, 8)}...)`);
-    } catch (error) {
-      Alert.alert("Supabase", error.message);
-    }
-  };
+    const resetButtonVerticalPadding = clamp(Math.floor(menuShortSide * 0.06), 6, 10);
+    const resetButtonHorizontalPadding = clamp(Math.floor(menuShortSide * 0.06), 8, 14);
+    const lineSpacing = clamp(Math.floor(shortSide * 0.006), 3, 8);
+    const stageGap = clamp(Math.floor(shortSide * 0.012), 6, 14);
 
-  const onSyncRemote = async () => {
-    if (!remoteGameId) {
-      Alert.alert("Supabase", "Créez d'abord une partie distante.");
-      return;
-    }
-    try {
-      await syncRemoteGame(remoteGameId, chess);
-      setSyncMessage("Synchronisation réussie");
-    } catch (error) {
-      Alert.alert("Supabase", error.message);
-    }
-  };
+    const cells = useMemo(() => buildCells(board), [board]);
+    const stats = useMemo(
+        () => computeStats(board, capturesBy),
+        [board, capturesBy],
+    );
+    const alivePlayers = stats.filter((s) => s.alive).map((s) => s.player);
+    const winner = alivePlayers.length === 1 ? alivePlayers[0] : null;
 
-  return (
-    <SafeAreaView style={styles.page}>
-      <StatusBar style="dark" />
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Expo Chess</Text>
-        <Text style={styles.subtitle}>Tour en cours: {currentTurn}</Text>
-        {gameOver ? <Text style={styles.gameOver}>Partie terminée</Text> : null}
+    const selectOrMove = (x, y) => {
+        const squareKey = keyOf(x, y);
+        const target = board[squareKey];
 
-        <View
-          style={[
-            styles.boardFrame,
-            {
-              width: boardSize + boardBorderWidth * 2,
-              height: boardSize + boardBorderWidth * 2,
-            },
-          ]}
-        >
-          <View style={[styles.board, { width: boardSize, height: boardSize }]}>
-            {squares.map(({ square, isLight, piece }) => {
-              const selected = selectedSquare === square;
-              return (
-                <Pressable
-                  key={square}
-                  style={[
-                    styles.square,
-                    {
-                      width: squareSize,
-                      height: squareSize,
-                      backgroundColor: isLight ? "#f2e8dc" : "#8a6f58",
-                    },
-                    selected && styles.selectedSquare,
-                  ]}
-                  onPress={() => selectOrMove(square)}
+        if (!selected) {
+            if (!target || target.player !== turn || winner) {
+                return;
+            }
+            setSelected({ x, y });
+            return;
+        }
+
+        if (selected.x === x && selected.y === y) {
+            setSelected(null);
+            return;
+        }
+
+        const sourceKey = keyOf(selected.x, selected.y);
+        const movingPiece = board[sourceKey];
+
+        if (!movingPiece || movingPiece.player !== turn) {
+            setSelected(null);
+            return;
+        }
+
+        if (target && target.player === turn) {
+            setSelected({ x, y });
+            return;
+        }
+
+        if (!isLegalMove(board, selected.x, selected.y, x, y, movingPiece)) {
+            return;
+        }
+
+        const nextBoard = { ...board };
+        delete nextBoard[sourceKey];
+
+        const movedPiece = shouldPromote(movingPiece, x, y)
+            ? { ...movingPiece, type: "queen" }
+            : movingPiece;
+
+        nextBoard[squareKey] = movedPiece;
+
+        const nextCaptures = { ...capturesBy };
+        if (target) {
+            nextCaptures[turn] += 1;
+        }
+
+        const nextStats = computeStats(nextBoard, nextCaptures);
+        const nextAlive = nextStats.filter((s) => s.alive).map((s) => s.player);
+        const nextTurn = getNextAlivePlayer(turn, nextAlive);
+
+        setBoard(nextBoard);
+        setCapturesBy(nextCaptures);
+        setTurn(nextTurn);
+        setMoveCount((value) => value + 1);
+        setSelected(null);
+    };
+
+    const resetGame = () => {
+        setBoard(createInitialBoard());
+        setTurn("white");
+        setSelected(null);
+        setMoveCount(0);
+        setCapturesBy({ white: 0, red: 0, black: 0, blue: 0 });
+    };
+
+    const whiteStats = stats.find((s) => s.player === "white");
+    const redStats = stats.find((s) => s.player === "red");
+    const blackStats = stats.find((s) => s.player === "black");
+    const blueStats = stats.find((s) => s.player === "blue");
+
+    return (
+        <SafeAreaView style={styles.page}>
+            <StatusBar style="light" />
+            <View style={styles.layoutRoot}>
+                <View
+                    style={[
+                        styles.sidebar,
+                        {
+                            width: sidebarWidth,
+                            padding: panelVerticalPadding,
+                            gap: stageGap,
+                        },
+                    ]}
                 >
-                  <Text style={styles.piece}>{pieceToSymbol(piece)}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
+                    <View
+                        style={[
+                            styles.menuPanel,
+                            {
+                                borderRadius: panelRadius,
+                                paddingHorizontal: panelHorizontalPadding,
+                                paddingVertical: panelVerticalPadding,
+                            },
+                        ]}
+                    >
+                        <Text
+                            style={[
+                                styles.cornerTitle,
+                                { fontSize: titleFontSize },
+                            ]}
+                        >
+                            Menu
+                        </Text>
+                        <Text
+                            style={[
+                                styles.cornerValue,
+                                { fontSize: valueFontSize, marginTop: lineSpacing },
+                            ]}
+                        >
+                            {winner
+                                ? `Gagnant: ${PLAYER_LABEL[winner]}`
+                                : PLAYER_LABEL[turn]}
+                        </Text>
+                        <Text
+                            style={[
+                                styles.cornerSub,
+                                { fontSize: subFontSize, marginTop: lineSpacing },
+                            ]}
+                        >
+                            Coups: {moveCount}
+                        </Text>
+                        <Pressable
+                            style={[
+                                styles.resetButton,
+                                {
+                                    marginTop: lineSpacing * 2,
+                                    paddingVertical: resetButtonVerticalPadding,
+                                    paddingHorizontal: resetButtonHorizontalPadding,
+                                    borderRadius: clamp(Math.floor(panelRadius * 0.7), 5, 10),
+                                },
+                            ]}
+                            onPress={resetGame}
+                        >
+                            <Text
+                                style={[
+                                    styles.resetText,
+                                    { fontSize: buttonFontSize },
+                                ]}
+                            >
+                                Nouvelle partie
+                            </Text>
+                        </Pressable>
+                    </View>
+                </View>
 
-        <View style={styles.actions}>
-          <Pressable style={styles.button} onPress={resetGame}>
-            <Text style={styles.buttonText}>Nouvelle partie</Text>
-          </Pressable>
-          <Pressable style={styles.button} onPress={onCreateRemote}>
-            <Text style={styles.buttonText}>Créer game Supabase</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.button, !supabaseConfigured && styles.buttonDisabled]}
-            onPress={onSyncRemote}
-            disabled={!supabaseConfigured}
-          >
-            <Text style={styles.buttonText}>Synchroniser</Text>
-          </Pressable>
-        </View>
+                <View style={[styles.stage, { padding: stageGap, gap: stageGap }]}>
+                    <View style={[styles.stageRow, { gap: stageGap }]}>
+                        <View
+                            style={[
+                                styles.cornerPanel,
+                                {
+                                    borderRadius: panelRadius,
+                                    paddingHorizontal: panelHorizontalPadding,
+                                    paddingVertical: panelVerticalPadding,
+                                },
+                            ]}
+                        >
+                            <View style={styles.cornerTextStack}>
+                                <Text
+                                    style={[
+                                        styles.cornerTitle,
+                                        { fontSize: titleFontSize },
+                                    ]}
+                                >
+                                    Noir
+                                </Text>
+                                <View style={styles.cornerRow}>
+                                    <Text
+                                        style={[
+                                            styles.cornerSub,
+                                            { fontSize: subFontSize },
+                                        ]}
+                                    >
+                                        Pièces
+                                    </Text>
+                                    <Text
+                                        style={[
+                                            styles.cornerSub,
+                                            { fontSize: subFontSize },
+                                        ]}
+                                    >
+                                        {blackStats?.pieces ?? 0}
+                                    </Text>
+                                </View>
+                                <View style={styles.cornerRow}>
+                                    <Text
+                                        style={[
+                                            styles.cornerSub,
+                                            { fontSize: subFontSize },
+                                        ]}
+                                    >
+                                        Prises
+                                    </Text>
+                                    <Text
+                                        style={[
+                                            styles.cornerSub,
+                                            { fontSize: subFontSize },
+                                        ]}
+                                    >
+                                        {blackStats?.captures ?? 0}
+                                    </Text>
+                                </View>
+                            </View>
+                        </View>
+                        <View style={{ width: boardSize }} />
+                        <View
+                            style={[
+                                styles.cornerPanel,
+                                {
+                                    borderRadius: panelRadius,
+                                    paddingHorizontal: panelHorizontalPadding,
+                                    paddingVertical: panelVerticalPadding,
+                                },
+                            ]}
+                        >
+                            <View style={styles.cornerTextStack}>
+                                <Text
+                                    style={[
+                                        styles.cornerTitle,
+                                        { fontSize: titleFontSize },
+                                    ]}
+                                >
+                                    Blanc
+                                </Text>
+                                <View style={styles.cornerRow}>
+                                    <Text
+                                        style={[
+                                            styles.cornerSub,
+                                            { fontSize: subFontSize },
+                                        ]}
+                                    >
+                                        Pièces
+                                    </Text>
+                                    <Text
+                                        style={[
+                                            styles.cornerSub,
+                                            { fontSize: subFontSize },
+                                        ]}
+                                    >
+                                        {whiteStats?.pieces ?? 0}
+                                    </Text>
+                                </View>
+                                <View style={styles.cornerRow}>
+                                    <Text
+                                        style={[
+                                            styles.cornerSub,
+                                            { fontSize: subFontSize },
+                                        ]}
+                                    >
+                                        Prises
+                                    </Text>
+                                    <Text
+                                        style={[
+                                            styles.cornerSub,
+                                            { fontSize: subFontSize },
+                                        ]}
+                                    >
+                                        {whiteStats?.captures ?? 0}
+                                    </Text>
+                                </View>
+                            </View>
+                        </View>
+                    </View>
 
-        <Text style={styles.syncInfo}>{syncMessage}</Text>
-        <Text style={styles.remoteId}>
-          Game ID: {remoteGameId ? remoteGameId : "aucune"}
-        </Text>
+                    <View style={[styles.stageMiddleRow, { gap: stageGap }]}>
+                        <View style={styles.sideSpacer} />
+                        <View
+                            style={[
+                                styles.board,
+                                {
+                                    width: boardSize,
+                                    height: boardSize,
+                                },
+                            ]}
+                        >
+                            {cells.map(({ x, y, playable, piece, isLight }) => {
+                                const isSelected = selected?.x === x && selected?.y === y;
+                                return (
+                                    <Pressable
+                                        key={keyOf(x, y)}
+                                        style={[
+                                            styles.square,
+                                            {
+                                                width: squareSize,
+                                                height: squareSize,
+                                                backgroundColor: playable
+                                                    ? isLight
+                                                        ? "#f4e4c8"
+                                                        : "#946e4d"
+                                                    : "transparent",
+                                                borderColor: isSelected
+                                                    ? "#f59e0b"
+                                                    : "transparent",
+                                            },
+                                        ]}
+                                        onPress={() => {
+                                            if (playable) {
+                                                selectOrMove(x, y);
+                                            }
+                                        }}
+                                    >
+                                        {piece ? (
+                                            <Text
+                                                style={[
+                                                    styles.piece,
+                                                    {
+                                                        color: PLAYER_COLOR[piece.player],
+                                                        fontSize: pieceFontSize,
+                                                        textShadowColor: "rgba(0, 0, 0, 0.65)",
+                                                        textShadowOffset: {
+                                                            width: 0,
+                                                            height: 1,
+                                                        },
+                                                        textShadowRadius: 2,
+                                                    },
+                                                ]}
+                                            >
+                                                {PIECE_SYMBOL[piece.type]}
+                                            </Text>
+                                        ) : null}
+                                    </Pressable>
+                                );
+                            })}
+                        </View>
+                        <View style={styles.sideSpacer} />
+                    </View>
 
-        <View style={styles.history}>
-          <Text style={styles.historyTitle}>Historique des coups</Text>
-          <Text style={styles.historyText}>
-            {history.length === 0 ? "Aucun coup pour l'instant." : history.join(" ")}
-          </Text>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
-  );
+                    <View style={[styles.stageRow, { gap: stageGap }]}>
+                        <View
+                            style={[
+                                styles.cornerPanel,
+                                {
+                                    borderRadius: panelRadius,
+                                    paddingHorizontal: panelHorizontalPadding,
+                                    paddingVertical: panelVerticalPadding,
+                                },
+                            ]}
+                        >
+                            <View style={styles.cornerTextStack}>
+                                <Text
+                                    style={[
+                                        styles.cornerTitle,
+                                        { fontSize: titleFontSize },
+                                    ]}
+                                >
+                                    Rouge
+                                </Text>
+                                <View style={styles.cornerRow}>
+                                    <Text
+                                        style={[
+                                            styles.cornerSub,
+                                            { fontSize: subFontSize },
+                                        ]}
+                                    >
+                                        Pièces
+                                    </Text>
+                                    <Text
+                                        style={[
+                                            styles.cornerSub,
+                                            { fontSize: subFontSize },
+                                        ]}
+                                    >
+                                        {redStats?.pieces ?? 0}
+                                    </Text>
+                                </View>
+                                <View style={styles.cornerRow}>
+                                    <Text
+                                        style={[
+                                            styles.cornerSub,
+                                            { fontSize: subFontSize },
+                                        ]}
+                                    >
+                                        Prises
+                                    </Text>
+                                    <Text
+                                        style={[
+                                            styles.cornerSub,
+                                            { fontSize: subFontSize },
+                                        ]}
+                                    >
+                                        {redStats?.captures ?? 0}
+                                    </Text>
+                                </View>
+                            </View>
+                        </View>
+                        <View style={{ width: boardSize }} />
+                        <View
+                            style={[
+                                styles.cornerPanel,
+                                {
+                                    borderRadius: panelRadius,
+                                    paddingHorizontal: panelHorizontalPadding,
+                                    paddingVertical: panelVerticalPadding,
+                                },
+                            ]}
+                        >
+                            <View style={styles.cornerTextStack}>
+                                <Text
+                                    style={[
+                                        styles.cornerTitle,
+                                        { fontSize: titleFontSize },
+                                    ]}
+                                >
+                                    Bleu
+                                </Text>
+                                <View style={styles.cornerRow}>
+                                    <Text
+                                        style={[
+                                            styles.cornerSub,
+                                            { fontSize: subFontSize },
+                                        ]}
+                                    >
+                                        Pièces
+                                    </Text>
+                                    <Text
+                                        style={[
+                                            styles.cornerSub,
+                                            { fontSize: subFontSize },
+                                        ]}
+                                    >
+                                        {blueStats?.pieces ?? 0}
+                                    </Text>
+                                </View>
+                                <View style={styles.cornerRow}>
+                                    <Text
+                                        style={[
+                                            styles.cornerSub,
+                                            { fontSize: subFontSize },
+                                        ]}
+                                    >
+                                        Prises
+                                    </Text>
+                                    <Text
+                                        style={[
+                                            styles.cornerSub,
+                                            { fontSize: subFontSize },
+                                        ]}
+                                    >
+                                        {blueStats?.captures ?? 0}
+                                    </Text>
+                                </View>
+                            </View>
+                        </View>
+                    </View>
+                </View>
+            </View>
+        </SafeAreaView>
+    );
 }
 
 const styles = StyleSheet.create({
-  page: {
-    flex: 1,
-    backgroundColor: "#f6f6f2",
-  },
-  content: {
-    paddingHorizontal: 12,
-    paddingBottom: 24,
-    alignItems: "center",
-    gap: 12,
-  },
-  title: {
-    marginTop: 8,
-    fontSize: 32,
-    fontWeight: "700",
-    color: "#1e1e1e",
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#404040",
-  },
-  gameOver: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#842029",
-    backgroundColor: "#f8d7da",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  board: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-  },
-  boardFrame: {
-    borderWidth: 2,
-    borderColor: "#3f2f24",
-  },
-  square: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  selectedSquare: {
-    borderWidth: 3,
-    borderColor: "#f7b500",
-  },
-  piece: {
-    fontSize: 30,
-  },
-  actions: {
-    width: "100%",
-    gap: 8,
-    marginTop: 4,
-  },
-  button: {
-    backgroundColor: "#2f4f4f",
-    borderRadius: 8,
-    paddingVertical: 10,
-    alignItems: "center",
-  },
-  buttonDisabled: {
-    opacity: 0.55,
-  },
-  buttonText: {
-    color: "#ffffff",
-    fontWeight: "600",
-    fontSize: 14,
-  },
-  syncInfo: {
-    color: "#2f4f4f",
-    fontSize: 14,
-  },
-  remoteId: {
-    color: "#444444",
-    fontSize: 12,
-  },
-  history: {
-    width: "100%",
-    backgroundColor: "#ffffff",
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#d4d4d4",
-  },
-  historyTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    marginBottom: 6,
-  },
-  historyText: {
-    color: "#222222",
-    lineHeight: 20,
-  },
+    page: {
+        flex: 1,
+        backgroundColor: "#111827",
+    },
+    layoutRoot: {
+        flex: 1,
+        flexDirection: "row",
+    },
+    sidebar: {
+        backgroundColor: "#0b1325",
+        borderRightWidth: 1,
+        borderRightColor: "rgba(255, 255, 255, 0.12)",
+    },
+    menuPanel: {
+        backgroundColor: "rgba(17, 24, 39, 0.92)",
+        borderWidth: 1,
+        borderColor: "rgba(255, 255, 255, 0.15)",
+    },
+    stage: {
+        flex: 1,
+    },
+    stageRow: {
+        flex: 1,
+        flexDirection: "row",
+    },
+    stageMiddleRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    sideSpacer: {
+        flex: 1,
+    },
+    cornerPanel: {
+        flex: 1,
+        backgroundColor: "rgba(17, 24, 39, 0.86)",
+        borderWidth: 1,
+        borderColor: "rgba(255, 255, 255, 0.15)",
+        justifyContent: "center",
+    },
+    board: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        backgroundColor: "#111827",
+    },
+    square: {
+        alignItems: "center",
+        justifyContent: "center",
+        borderWidth: 2,
+    },
+    piece: {
+        fontWeight: "700",
+    },
+    cornerTextStack: {
+        flexDirection: "column",
+        gap: 4,
+    },
+    cornerRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 12,
+    },
+    cornerTitle: {
+        color: "#e5e7eb",
+        fontWeight: "700",
+    },
+    cornerValue: {
+        color: "#f9fafb",
+        fontWeight: "700",
+    },
+    cornerSub: {
+        color: "#d1d5db",
+        flexShrink: 1,
+    },
+    resetButton: {
+        backgroundColor: "#2563eb",
+    },
+    resetText: {
+        color: "#fff",
+        fontWeight: "700",
+        textAlign: "center",
+    },
 });
