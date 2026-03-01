@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { BOARD_SIZE, PLAYER_COLOR, PLAYER_LABEL, PIECE_SYMBOL } from "./src/game/constants.js";
 import { buildCells, createInitialBoard, keyOf } from "./src/game/board.js";
-import { getNextAlivePlayer, isLegalMove, shouldPromote } from "./src/game/rules.js";
+import { applyMove, createCapturesBy } from "./src/game/engine.js";
 import { computeStats } from "./src/game/stats.js";
 
 function clamp(value, min, max) {
@@ -24,10 +24,7 @@ export default function App() {
     const [selected, setSelected] = useState(null);
     const [moveCount, setMoveCount] = useState(0);
     const [capturesBy, setCapturesBy] = useState({
-        white: 0,
-        red: 0,
-        black: 0,
-        blue: 0,
+        ...createCapturesBy(),
     });
 
     const shortSide = Math.min(width, height);
@@ -81,45 +78,33 @@ export default function App() {
             return;
         }
 
-        const sourceKey = keyOf(selected.x, selected.y);
-        const movingPiece = board[sourceKey];
-
-        if (!movingPiece || movingPiece.player !== turn) {
-            setSelected(null);
-            return;
-        }
-
         if (target && target.player === turn) {
             setSelected({ x, y });
             return;
         }
 
-        if (!isLegalMove(board, selected.x, selected.y, x, y, movingPiece)) {
+        const result = applyMove(
+            {
+                board,
+                turn,
+                moveCount,
+                capturesBy,
+                winner,
+            },
+            selected.x,
+            selected.y,
+            x,
+            y,
+        );
+
+        if (!result.ok) {
             return;
         }
 
-        const nextBoard = { ...board };
-        delete nextBoard[sourceKey];
-
-        const movedPiece = shouldPromote(movingPiece, x, y)
-            ? { ...movingPiece, type: "queen" }
-            : movingPiece;
-
-        nextBoard[squareKey] = movedPiece;
-
-        const nextCaptures = { ...capturesBy };
-        if (target) {
-            nextCaptures[turn] += 1;
-        }
-
-        const nextStats = computeStats(nextBoard, nextCaptures);
-        const nextAlive = nextStats.filter((s) => s.alive).map((s) => s.player);
-        const nextTurn = getNextAlivePlayer(turn, nextAlive);
-
-        setBoard(nextBoard);
-        setCapturesBy(nextCaptures);
-        setTurn(nextTurn);
-        setMoveCount((value) => value + 1);
+        setBoard(result.state.board);
+        setCapturesBy(result.state.capturesBy);
+        setTurn(result.state.turn);
+        setMoveCount(result.state.moveCount);
         setSelected(null);
     };
 
@@ -128,7 +113,7 @@ export default function App() {
         setTurn("white");
         setSelected(null);
         setMoveCount(0);
-        setCapturesBy({ white: 0, red: 0, black: 0, blue: 0 });
+        setCapturesBy(createCapturesBy());
     };
 
     const whiteStats = stats.find((s) => s.player === "white");
