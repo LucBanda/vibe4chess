@@ -122,6 +122,9 @@ export default function App() {
         if (!isInGame) {
             return;
         }
+        if (playMode !== "local" && turn !== localPlayerColor) {
+            return;
+        }
         if (controlByColor[turn] === "robot") {
             return;
         }
