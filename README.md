@@ -48,3 +48,4 @@ EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
 - Reset de partie locale
 - Création et synchronisation d'une partie distante dans Supabase (`chess_games`)
 - Création multijoueur: visibilité `publique/privée` + sélection des joueurs (UUID Supabase par couleur)
+- Sélection `Humain/Robot` par couleur avec coups automatiques des robots

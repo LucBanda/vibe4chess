@@ -1,5 +1,5 @@
 import { StatusBar } from "expo-status-bar";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
     Alert,
     Pressable,
@@ -18,6 +18,7 @@ import {
     PIECE_SYMBOL,
 } from "./src/game/constants.js";
 import { buildCells, createInitialBoard, keyOf } from "./src/game/board.js";
+import { chooseRobotMove } from "./src/game/bot.js";
 import { applyMove, createCapturesBy } from "./src/game/engine.js";
 import { computeStats } from "./src/game/stats.js";
 import {
@@ -47,6 +48,12 @@ export default function App() {
         red: "",
         black: "",
         blue: "",
+    });
+    const [controlByColor, setControlByColor] = useState({
+        white: "human",
+        red: "human",
+        black: "human",
+        blue: "human",
     });
 
     const shortSide = Math.min(width, height);
@@ -96,6 +103,10 @@ export default function App() {
     const winner = alivePlayers.length === 1 ? alivePlayers[0] : null;
 
     const selectOrMove = (x, y) => {
+        if (controlByColor[turn] === "robot") {
+            return;
+        }
+
         const squareKey = keyOf(x, y);
         const target = board[squareKey];
 
@@ -180,6 +191,13 @@ export default function App() {
         }));
     };
 
+    const setPlayerControl = (color, mode) => {
+        setControlByColor((previous) => ({
+            ...previous,
+            [color]: mode,
+        }));
+    };
+
     const onSyncRemote = async () => {
         if (!remoteGameId) {
             Alert.alert("Supabase", "Crée d'abord une partie distante.");
@@ -203,6 +221,61 @@ export default function App() {
     const redStats = stats.find((s) => s.player === "red");
     const blackStats = stats.find((s) => s.player === "black");
     const blueStats = stats.find((s) => s.player === "blue");
+
+    useEffect(() => {
+        if (winner || controlByColor[turn] !== "robot") {
+            return undefined;
+        }
+
+        const timerId = setTimeout(() => {
+            const botMove = chooseRobotMove({
+                board,
+                turn,
+                moveCount,
+                capturesBy,
+                winner,
+            });
+
+            if (!botMove) {
+                setSyncMessage(
+                    `Robot ${PLAYER_LABEL[turn]}: aucun coup disponible`,
+                );
+                return;
+            }
+
+            const result = applyMove(
+                {
+                    board,
+                    turn,
+                    moveCount,
+                    capturesBy,
+                    winner,
+                },
+                botMove.fromX,
+                botMove.fromY,
+                botMove.toX,
+                botMove.toY,
+            );
+
+            if (!result.ok) {
+                setSyncMessage(
+                    `Robot ${PLAYER_LABEL[turn]}: coup invalide (${result.reason})`,
+                );
+                return;
+            }
+
+            setBoard(result.state.board);
+            setCapturesBy(result.state.capturesBy);
+            setTurn(result.state.turn);
+            setMoveCount(result.state.moveCount);
+            setSelected(null);
+            setSyncMessage(
+                `Robot ${PLAYER_LABEL[turn]}: (${botMove.fromX},${botMove.fromY}) -> (${botMove.toX},${botMove.toY})`,
+            );
+        }, 500);
+
+        return () => clearTimeout(timerId);
+    }, [board, turn, moveCount, capturesBy, winner, controlByColor]);
 
     return (
         <SafeAreaView style={styles.page}>
@@ -369,6 +442,63 @@ export default function App() {
                                     autoCapitalize="none"
                                     autoCorrect={false}
                                 />
+                            </View>
+                        ))}
+
+                        <Text
+                            style={[
+                                styles.cornerSub,
+                                {
+                                    fontSize: subFontSize,
+                                    marginTop: lineSpacing * 2,
+                                },
+                            ]}
+                        >
+                            Contrôle des joueurs
+                        </Text>
+                        {PLAYERS.map((color) => (
+                            <View
+                                key={`${color}-control`}
+                                style={[
+                                    styles.playerInputRow,
+                                    { marginTop: lineSpacing },
+                                ]}
+                            >
+                                <Text style={styles.playerInputLabel}>
+                                    {PLAYER_LABEL[color]}
+                                </Text>
+                                <View style={styles.playerControlRow}>
+                                    <Pressable
+                                        style={[
+                                            styles.controlButton,
+                                            controlByColor[color] === "human"
+                                                ? styles.controlButtonActive
+                                                : null,
+                                        ]}
+                                        onPress={() =>
+                                            setPlayerControl(color, "human")
+                                        }
+                                    >
+                                        <Text style={styles.controlButtonText}>
+                                            Humain
+                                        </Text>
+                                    </Pressable>
+                                    <Pressable
+                                        style={[
+                                            styles.controlButton,
+                                            controlByColor[color] === "robot"
+                                                ? styles.controlButtonActive
+                                                : null,
+                                        ]}
+                                        onPress={() =>
+                                            setPlayerControl(color, "robot")
+                                        }
+                                    >
+                                        <Text style={styles.controlButtonText}>
+                                            Robot
+                                        </Text>
+                                    </Pressable>
+                                </View>
                             </View>
                         ))}
 
@@ -903,6 +1033,29 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         paddingVertical: 6,
         fontSize: 12,
+    },
+    playerControlRow: {
+        flex: 1,
+        flexDirection: "row",
+        gap: 6,
+    },
+    controlButton: {
+        flex: 1,
+        backgroundColor: "#1f2937",
+        borderWidth: 1,
+        borderColor: "rgba(148, 163, 184, 0.35)",
+        borderRadius: 6,
+        paddingVertical: 6,
+    },
+    controlButtonActive: {
+        backgroundColor: "#2563eb",
+        borderColor: "#60a5fa",
+    },
+    controlButtonText: {
+        color: "#e5e7eb",
+        textAlign: "center",
+        fontSize: 12,
+        fontWeight: "600",
     },
     resetText: {
         color: "#fff",

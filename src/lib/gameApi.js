@@ -1,4 +1,4 @@
-import { supabase, supabaseConfigured } from "./supabase";
+import { supabase, supabaseConfigured } from "./supabase.js";
 
 const LOG_PREFIX = "[supabase][gameApi]";
 const VISIBILITIES = new Set(["public", "private"]);
@@ -108,7 +108,7 @@ async function ensureAuthenticatedUserId() {
     return userId;
 }
 
-function buildCreateOptions(ownerId, options) {
+export function normalizeCreateOptions(ownerId, options = {}) {
     const requestedVisibility = options?.visibility ?? "private";
     const visibility = VISIBILITIES.has(requestedVisibility)
         ? requestedVisibility
@@ -136,7 +136,7 @@ function buildCreateOptions(ownerId, options) {
 export async function createRemoteGame(gameState, options = {}) {
     console.log(`${LOG_PREFIX} createRemoteGame:start`);
     const userId = await ensureAuthenticatedUserId();
-    const createOptions = buildCreateOptions(userId, options);
+    const createOptions = normalizeCreateOptions(userId, options);
     const payload = {
         ...asPayload(gameState),
         owner_id: userId,
