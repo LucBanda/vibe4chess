@@ -2,6 +2,8 @@ import { supabase, supabaseConfigured } from "./supabase.js";
 
 const LOG_PREFIX = "[supabase][gameApi]";
 const PLAYER_COLORS = ["white", "red", "black", "blue"];
+const PLAYER_STATUS = new Set(["idle", "in_game"]);
+const SESSION_MODES = new Set(["local", "remote_create", "remote_join"]);
 
 function asPayload(gameState) {
     if (typeof gameState?.fen === "function") {
@@ -277,6 +279,83 @@ export async function listJoinableGames() {
 
 export async function getAuthenticatedUserId() {
     return ensureAuthenticatedUserId();
+}
+
+export function buildPlayerStatusPayload(statusInput = {}) {
+    const requestedStatus = statusInput?.status ?? "idle";
+    const status = PLAYER_STATUS.has(requestedStatus) ? requestedStatus : "idle";
+    const requestedMode = statusInput?.sessionMode ?? "local";
+    const sessionMode = SESSION_MODES.has(requestedMode)
+        ? requestedMode
+        : "local";
+    const requestedColor = statusInput?.currentColor ?? null;
+    const currentColor = PLAYER_COLORS.includes(requestedColor)
+        ? requestedColor
+        : null;
+    const currentGameId =
+        typeof statusInput?.currentGameId === "string" &&
+        statusInput.currentGameId.trim().length > 0
+            ? statusInput.currentGameId.trim()
+            : null;
+
+    return {
+        status,
+        current_game_id: status === "in_game" ? currentGameId : null,
+        current_color: status === "in_game" ? currentColor : null,
+        session_mode: sessionMode,
+        is_owner: status === "in_game" ? Boolean(statusInput?.isOwner) : false,
+        updated_at: new Date().toISOString(),
+    };
+}
+
+export async function upsertPlayerStatus(statusInput = {}) {
+    console.log(`${LOG_PREFIX} upsertPlayerStatus:start`, {
+        status: statusInput?.status ?? "idle",
+        sessionMode: statusInput?.sessionMode ?? "local",
+        currentGameId: statusInput?.currentGameId ?? null,
+        currentColor: statusInput?.currentColor ?? null,
+        isOwner: Boolean(statusInput?.isOwner),
+    });
+    const userId = await ensureAuthenticatedUserId();
+    const payload = {
+        user_id: userId,
+        ...buildPlayerStatusPayload(statusInput),
+    };
+
+    const { error } = await supabase
+        .from("chess_player_status")
+        .upsert(payload, { onConflict: "user_id" });
+
+    if (error) {
+        console.error(`${LOG_PREFIX} upsertPlayerStatus:error`, {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint,
+        });
+        throw new Error(`Statut joueur impossible à enregistrer: ${error.message}`);
+    }
+
+    console.log(`${LOG_PREFIX} upsertPlayerStatus:success`, {
+        userId,
+        status: payload.status,
+        sessionMode: payload.session_mode,
+        currentGameId: payload.current_game_id,
+        currentColor: payload.current_color,
+        isOwner: payload.is_owner,
+    });
+}
+
+export async function clearPlayerStatus() {
+    console.log(`${LOG_PREFIX} clearPlayerStatus:start`);
+    await upsertPlayerStatus({
+        status: "idle",
+        sessionMode: "local",
+        currentGameId: null,
+        currentColor: null,
+        isOwner: false,
+    });
+    console.log(`${LOG_PREFIX} clearPlayerStatus:success`);
 }
 
 export async function deleteRemoteGame(gameId) {

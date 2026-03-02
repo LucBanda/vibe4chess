@@ -331,3 +331,163 @@ on public.chess_games
 for delete
 to authenticated
 using (owner_id = auth.uid());
+
+create table if not exists public.chess_player_status (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  status text not null default 'idle' check (status in ('idle', 'in_game')),
+  session_mode text not null default 'local' check (session_mode in ('local', 'remote_create', 'remote_join')),
+  current_game_id uuid null references public.chess_games(id) on delete set null,
+  current_color text null check (current_color in ('white', 'red', 'black', 'blue')),
+  is_owner boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.chess_player_status
+  add column if not exists status text;
+
+alter table public.chess_player_status
+  alter column status set default 'idle';
+
+update public.chess_player_status
+set status = 'idle'
+where status is null;
+
+alter table public.chess_player_status
+  alter column status set not null;
+
+alter table public.chess_player_status
+  drop constraint if exists chess_player_status_status_check;
+
+alter table public.chess_player_status
+  add constraint chess_player_status_status_check
+  check (status in ('idle', 'in_game'));
+
+alter table public.chess_player_status
+  add column if not exists session_mode text;
+
+alter table public.chess_player_status
+  alter column session_mode set default 'local';
+
+update public.chess_player_status
+set session_mode = 'local'
+where session_mode is null;
+
+alter table public.chess_player_status
+  alter column session_mode set not null;
+
+alter table public.chess_player_status
+  drop constraint if exists chess_player_status_session_mode_check;
+
+alter table public.chess_player_status
+  add constraint chess_player_status_session_mode_check
+  check (session_mode in ('local', 'remote_create', 'remote_join'));
+
+alter table public.chess_player_status
+  add column if not exists current_game_id uuid;
+
+alter table public.chess_player_status
+  add column if not exists current_color text;
+
+alter table public.chess_player_status
+  drop constraint if exists chess_player_status_current_color_check;
+
+alter table public.chess_player_status
+  add constraint chess_player_status_current_color_check
+  check (current_color in ('white', 'red', 'black', 'blue'));
+
+alter table public.chess_player_status
+  add column if not exists is_owner boolean;
+
+alter table public.chess_player_status
+  alter column is_owner set default false;
+
+update public.chess_player_status
+set is_owner = false
+where is_owner is null;
+
+alter table public.chess_player_status
+  alter column is_owner set not null;
+
+alter table public.chess_player_status
+  add column if not exists updated_at timestamptz;
+
+update public.chess_player_status
+set updated_at = now()
+where updated_at is null;
+
+alter table public.chess_player_status
+  alter column updated_at set default now();
+
+alter table public.chess_player_status
+  alter column updated_at set not null;
+
+alter table public.chess_player_status
+  add column if not exists user_id uuid;
+
+alter table public.chess_player_status
+  alter column user_id set default auth.uid();
+
+update public.chess_player_status
+set user_id = auth.uid()
+where user_id is null;
+
+alter table public.chess_player_status
+  alter column user_id set not null;
+
+alter table public.chess_player_status
+  drop constraint if exists chess_player_status_user_id_fkey;
+
+alter table public.chess_player_status
+  add constraint chess_player_status_user_id_fkey
+  foreign key (user_id)
+  references auth.users(id)
+  on delete cascade;
+
+alter table public.chess_player_status
+  drop constraint if exists chess_player_status_current_game_id_fkey;
+
+alter table public.chess_player_status
+  add constraint chess_player_status_current_game_id_fkey
+  foreign key (current_game_id)
+  references public.chess_games(id)
+  on delete set null;
+
+create index if not exists chess_player_status_updated_at_idx
+  on public.chess_player_status(updated_at desc);
+
+alter table public.chess_player_status enable row level security;
+alter table public.chess_player_status force row level security;
+
+revoke all on public.chess_player_status from anon;
+revoke all on public.chess_player_status from authenticated;
+grant select, insert, update, delete on public.chess_player_status to authenticated;
+
+drop policy if exists "Allow own status read" on public.chess_player_status;
+drop policy if exists "Allow own status insert" on public.chess_player_status;
+drop policy if exists "Allow own status update" on public.chess_player_status;
+drop policy if exists "Allow own status delete" on public.chess_player_status;
+
+create policy "Allow own status read"
+on public.chess_player_status
+for select
+to authenticated
+using (auth.uid() = user_id);
+
+create policy "Allow own status insert"
+on public.chess_player_status
+for insert
+to authenticated
+with check (auth.uid() = user_id);
+
+create policy "Allow own status update"
+on public.chess_player_status
+for update
+to authenticated
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+create policy "Allow own status delete"
+on public.chess_player_status
+for delete
+to authenticated
+using (auth.uid() = user_id);

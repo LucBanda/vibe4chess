@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { normalizeCreateOptions } from "../src/lib/gameApi.js";
+import {
+  buildPlayerStatusPayload,
+  normalizeCreateOptions,
+} from "../src/lib/gameApi.js";
 
 test("normalizeCreateOptions assigns owner to white when missing", () => {
   const ownerId = "11111111-1111-4111-8111-111111111111";
@@ -61,4 +64,37 @@ test("normalizeCreateOptions marks robot seats as occupied", () => {
     black: "robot",
     blue: "66666666-6666-4666-8666-666666666666",
   });
+});
+
+test("buildPlayerStatusPayload keeps in_game fields when valid", () => {
+  const payload = buildPlayerStatusPayload({
+    status: "in_game",
+    sessionMode: "remote_join",
+    currentGameId: " 77777777-7777-4777-8777-777777777777 ",
+    currentColor: "blue",
+    isOwner: true,
+  });
+
+  assert.equal(payload.status, "in_game");
+  assert.equal(payload.session_mode, "remote_join");
+  assert.equal(payload.current_game_id, "77777777-7777-4777-8777-777777777777");
+  assert.equal(payload.current_color, "blue");
+  assert.equal(payload.is_owner, true);
+  assert.ok(typeof payload.updated_at === "string");
+});
+
+test("buildPlayerStatusPayload sanitizes unsupported values", () => {
+  const payload = buildPlayerStatusPayload({
+    status: "whatever",
+    sessionMode: "offline",
+    currentGameId: "   ",
+    currentColor: "green",
+    isOwner: true,
+  });
+
+  assert.equal(payload.status, "idle");
+  assert.equal(payload.session_mode, "local");
+  assert.equal(payload.current_game_id, null);
+  assert.equal(payload.current_color, null);
+  assert.equal(payload.is_owner, false);
 });
