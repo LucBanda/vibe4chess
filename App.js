@@ -9,7 +9,12 @@ import {
     useWindowDimensions,
     View,
 } from "react-native";
-import { BOARD_SIZE, PLAYER_COLOR, PLAYER_LABEL, PIECE_SYMBOL } from "./src/game/constants.js";
+import {
+    BOARD_SIZE,
+    PLAYER_COLOR,
+    PLAYER_LABEL,
+    PIECE_SYMBOL,
+} from "./src/game/constants.js";
 import { buildCells, createInitialBoard, keyOf } from "./src/game/board.js";
 import { applyMove, createCapturesBy } from "./src/game/engine.js";
 import { computeStats } from "./src/game/stats.js";
@@ -40,7 +45,11 @@ export default function App() {
     const stageWidth = Math.max(width - sidebarWidth, 220);
     const boardPixelSize = Math.floor(Math.min(width, height) - 12);
     const renderedBoardSize = Math.floor(
-        clamp(Math.min(stageWidth * 0.84, height * 0.76, boardPixelSize), 196, 900),
+        clamp(
+            Math.min(stageWidth * 0.84, height * 0.76, boardPixelSize),
+            196,
+            900,
+        ),
     );
     const squareSize = Math.floor(renderedBoardSize / BOARD_SIZE);
     const boardSize = squareSize * BOARD_SIZE;
@@ -56,8 +65,16 @@ export default function App() {
     const buttonFontSize = clamp(Math.floor(menuShortSide * 0.1), 10, 14);
     const pieceFontSize = clamp(Math.floor(squareSize * 0.72), 12, 40);
 
-    const resetButtonVerticalPadding = clamp(Math.floor(menuShortSide * 0.06), 6, 10);
-    const resetButtonHorizontalPadding = clamp(Math.floor(menuShortSide * 0.06), 8, 14);
+    const resetButtonVerticalPadding = clamp(
+        Math.floor(menuShortSide * 0.06),
+        6,
+        10,
+    );
+    const resetButtonHorizontalPadding = clamp(
+        Math.floor(menuShortSide * 0.06),
+        8,
+        14,
+    );
     const lineSpacing = clamp(Math.floor(shortSide * 0.006), 3, 8);
     const stageGap = clamp(Math.floor(shortSide * 0.012), 6, 14);
 
@@ -127,6 +144,7 @@ export default function App() {
 
     const onCreateRemote = async () => {
         try {
+            console.log("about to create remote");
             const result = await createRemoteGame({
                 board,
                 turn,
@@ -135,7 +153,9 @@ export default function App() {
                 winner,
             });
             setRemoteGameId(result.id);
-            setSyncMessage(`Remote: partie créée (${result.id.slice(0, 8)}...)`);
+            setSyncMessage(
+                `Remote: partie créée (${result.id.slice(0, 8)}...)`,
+            );
         } catch (error) {
             Alert.alert("Supabase", error.message);
         }
@@ -200,7 +220,10 @@ export default function App() {
                         <Text
                             style={[
                                 styles.cornerValue,
-                                { fontSize: valueFontSize, marginTop: lineSpacing },
+                                {
+                                    fontSize: valueFontSize,
+                                    marginTop: lineSpacing,
+                                },
                             ]}
                         >
                             {winner
@@ -210,7 +233,10 @@ export default function App() {
                         <Text
                             style={[
                                 styles.cornerSub,
-                                { fontSize: subFontSize, marginTop: lineSpacing },
+                                {
+                                    fontSize: subFontSize,
+                                    marginTop: lineSpacing,
+                                },
                             ]}
                         >
                             Coups: {moveCount}
@@ -221,8 +247,13 @@ export default function App() {
                                 {
                                     marginTop: lineSpacing * 2,
                                     paddingVertical: resetButtonVerticalPadding,
-                                    paddingHorizontal: resetButtonHorizontalPadding,
-                                    borderRadius: clamp(Math.floor(panelRadius * 0.7), 5, 10),
+                                    paddingHorizontal:
+                                        resetButtonHorizontalPadding,
+                                    borderRadius: clamp(
+                                        Math.floor(panelRadius * 0.7),
+                                        5,
+                                        10,
+                                    ),
                                 },
                             ]}
                             onPress={resetGame}
@@ -243,8 +274,13 @@ export default function App() {
                                 {
                                     marginTop: lineSpacing,
                                     paddingVertical: resetButtonVerticalPadding,
-                                    paddingHorizontal: resetButtonHorizontalPadding,
-                                    borderRadius: clamp(Math.floor(panelRadius * 0.7), 5, 10),
+                                    paddingHorizontal:
+                                        resetButtonHorizontalPadding,
+                                    borderRadius: clamp(
+                                        Math.floor(panelRadius * 0.7),
+                                        5,
+                                        10,
+                                    ),
                                 },
                             ]}
                             onPress={onCreateRemote}
@@ -256,7 +292,7 @@ export default function App() {
                                     { fontSize: buttonFontSize },
                                 ]}
                             >
-                                Créer remote
+                                {supabaseConfigured ? "Créer remote" : ""}
                             </Text>
                         </Pressable>
 
@@ -266,8 +302,13 @@ export default function App() {
                                 {
                                     marginTop: lineSpacing,
                                     paddingVertical: resetButtonVerticalPadding,
-                                    paddingHorizontal: resetButtonHorizontalPadding,
-                                    borderRadius: clamp(Math.floor(panelRadius * 0.7), 5, 10),
+                                    paddingHorizontal:
+                                        resetButtonHorizontalPadding,
+                                    borderRadius: clamp(
+                                        Math.floor(panelRadius * 0.7),
+                                        5,
+                                        10,
+                                    ),
                                     opacity: supabaseConfigured ? 1 : 0.5,
                                 },
                             ]}
@@ -287,7 +328,10 @@ export default function App() {
                         <Text
                             style={[
                                 styles.cornerSub,
-                                { fontSize: subFontSize, marginTop: lineSpacing * 2 },
+                                {
+                                    fontSize: subFontSize,
+                                    marginTop: lineSpacing * 2,
+                                },
                             ]}
                         >
                             {syncMessage}
@@ -295,7 +339,10 @@ export default function App() {
                         <Text
                             style={[
                                 styles.cornerSub,
-                                { fontSize: subFontSize, marginTop: lineSpacing },
+                                {
+                                    fontSize: subFontSize,
+                                    marginTop: lineSpacing,
+                                },
                             ]}
                         >
                             Game ID: {remoteGameId ?? "aucun"}
@@ -304,7 +351,11 @@ export default function App() {
                             <Text
                                 style={[
                                     styles.cornerSub,
-                                    { fontSize: subFontSize, marginTop: lineSpacing, color: "#fca5a5" },
+                                    {
+                                        fontSize: subFontSize,
+                                        marginTop: lineSpacing,
+                                        color: "#fca5a5",
+                                    },
                                 ]}
                             >
                                 Supabase non configuré (.env requis)
@@ -313,7 +364,9 @@ export default function App() {
                     </View>
                 </View>
 
-                <View style={[styles.stage, { padding: stageGap, gap: stageGap }]}>
+                <View
+                    style={[styles.stage, { padding: stageGap, gap: stageGap }]}
+                >
                     <View style={[styles.stageRow, { gap: stageGap }]}>
                         <View
                             style={[
@@ -444,7 +497,8 @@ export default function App() {
                             ]}
                         >
                             {cells.map(({ x, y, playable, piece, isLight }) => {
-                                const isSelected = selected?.x === x && selected?.y === y;
+                                const isSelected =
+                                    selected?.x === x && selected?.y === y;
                                 return (
                                     <Pressable
                                         key={keyOf(x, y)}
@@ -474,9 +528,12 @@ export default function App() {
                                                 style={[
                                                     styles.piece,
                                                     {
-                                                        color: PLAYER_COLOR[piece.player],
+                                                        color: PLAYER_COLOR[
+                                                            piece.player
+                                                        ],
                                                         fontSize: pieceFontSize,
-                                                        textShadowColor: "rgba(0, 0, 0, 0.65)",
+                                                        textShadowColor:
+                                                            "rgba(0, 0, 0, 0.65)",
                                                         textShadowOffset: {
                                                             width: 0,
                                                             height: 1,
