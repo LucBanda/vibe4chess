@@ -106,7 +106,7 @@ alter table public.chess_games force row level security;
 
 revoke all on public.chess_games from anon;
 revoke all on public.chess_games from authenticated;
-grant select, insert, update on public.chess_games to authenticated;
+grant select, insert, update, delete on public.chess_games to authenticated;
 
 drop policy if exists "Allow anon read chess games" on public.chess_games;
 drop policy if exists "Allow anon insert chess games" on public.chess_games;
@@ -119,6 +119,7 @@ drop policy if exists "Allow multiplayer insert chess games" on public.chess_gam
 drop policy if exists "Allow multiplayer update chess games" on public.chess_games;
 drop policy if exists "Allow owner full update chess games" on public.chess_games;
 drop policy if exists "Allow participant state update chess games" on public.chess_games;
+drop policy if exists "Allow owner delete chess games" on public.chess_games;
 
 create or replace function public.chess_games_guard_update()
 returns trigger
@@ -324,3 +325,9 @@ with check (
     where players.player_id = auth.uid()::text
   )
 );
+
+create policy "Allow owner delete chess games"
+on public.chess_games
+for delete
+to authenticated
+using (owner_id = auth.uid());

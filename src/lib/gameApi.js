@@ -275,4 +275,23 @@ export async function listJoinableGames() {
     });
 }
 
+export async function deleteRemoteGame(gameId) {
+    await ensureAuthenticatedUserId();
+    const trimmedGameId = gameId?.trim();
+    if (!trimmedGameId) {
+        throw new Error("Game ID requis pour supprimer une partie.");
+    }
+
+    const { error } = await supabase
+        .from("chess_games")
+        .delete()
+        .eq("id", trimmedGameId);
+
+    if (error) {
+        throw new Error(
+            `Suppression impossible: ${error.message}. Vérifie que la policy DELETE owner est bien appliquée dans Supabase (réexécute supabase/schema.sql).`,
+        );
+    }
+}
+
 export { supabaseConfigured };
