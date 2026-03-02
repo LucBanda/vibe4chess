@@ -10,6 +10,7 @@ test("normalizeLocalSession keeps valid in-game values", () => {
   const normalized = normalizeLocalSession(
     {
       userId: " 11111111-1111-4111-8111-111111111111 ",
+      username: "alice",
       status: "in_game",
       sessionMode: "remote_join",
       currentGameId: " 22222222-2222-4222-8222-222222222222 ",
@@ -22,6 +23,7 @@ test("normalizeLocalSession keeps valid in-game values", () => {
 
   assert.deepEqual(normalized, {
     userId: "11111111-1111-4111-8111-111111111111",
+    username: "alice",
     status: "in_game",
     sessionMode: "remote_join",
     currentGameId: "22222222-2222-4222-8222-222222222222",
@@ -35,6 +37,7 @@ test("normalizeLocalSession sanitizes invalid values and clears in-game fields",
   const normalized = normalizeLocalSession(
     {
       userId: "   ",
+      username: "   ",
       status: "broken",
       sessionMode: "offline",
       currentGameId: "x",
@@ -46,6 +49,7 @@ test("normalizeLocalSession sanitizes invalid values and clears in-game fields",
 
   assert.deepEqual(normalized, {
     userId: null,
+    username: "player",
     status: "idle",
     sessionMode: "local",
     currentGameId: null,
@@ -59,6 +63,7 @@ test("parseLocalSession returns normalized content", () => {
   const parsed = parseLocalSession(
     JSON.stringify({
       userId: "33333333-3333-4333-8333-333333333333",
+      username: "bob",
       status: "in_game",
       sessionMode: "remote_create",
       currentGameId: "44444444-4444-4444-8444-444444444444",
@@ -68,6 +73,7 @@ test("parseLocalSession returns normalized content", () => {
   );
 
   assert.equal(parsed.userId, "33333333-3333-4333-8333-333333333333");
+  assert.equal(parsed.username, "bob");
   assert.equal(parsed.status, "in_game");
   assert.equal(parsed.sessionMode, "remote_create");
   assert.equal(parsed.currentGameId, "44444444-4444-4444-8444-444444444444");

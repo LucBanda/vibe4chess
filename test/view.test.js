@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { createInitialBoard, keyOf } from "../src/game/board.js";
 import {
   boardToDisplay,
+  colorOfPlayer,
   createPerspectiveCells,
   displayToBoard,
   firstHumanColor,
@@ -50,6 +51,20 @@ test("freeSeatsOf excludes occupied slots including robots", () => {
   });
 
   assert.deepEqual(free, ["black", "blue"]);
+});
+
+test("colorOfPlayer resolves the assigned color for a player id", () => {
+  const color = colorOfPlayer(
+    {
+      white: "alice",
+      red: "robot",
+      blue: "bob",
+    },
+    "bob",
+  );
+
+  assert.equal(color, "blue");
+  assert.equal(colorOfPlayer({}, "bob"), null);
 });
 
 test("firstHumanColor returns first human seat or white fallback", () => {

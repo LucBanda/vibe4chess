@@ -1,3 +1,5 @@
+import { normalizeUsername } from "./username.js";
+
 const PLAYER_COLORS = ["white", "red", "black", "blue"];
 const PLAYER_STATUS = new Set(["idle", "in_game"]);
 const SESSION_MODES = new Set(["local", "remote_create", "remote_join"]);
@@ -12,6 +14,7 @@ function asTrimmedString(value) {
 
 export function normalizeLocalSession(sessionData = {}, nowIso = null) {
     const userId = asTrimmedString(sessionData?.userId);
+    const username = normalizeUsername(sessionData?.username, "player");
     const requestedStatus = sessionData?.status ?? "idle";
     const status = PLAYER_STATUS.has(requestedStatus) ? requestedStatus : "idle";
     const requestedMode = sessionData?.sessionMode ?? "local";
@@ -27,6 +30,7 @@ export function normalizeLocalSession(sessionData = {}, nowIso = null) {
 
     return {
         userId,
+        username,
         status,
         sessionMode,
         currentGameId: status === "in_game" ? currentGameId : null,

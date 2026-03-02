@@ -46,6 +46,19 @@ export function freeSeatsOf(playerIds) {
   return PLAYERS.filter((color) => !playerIds?.[color]);
 }
 
+export function colorOfPlayer(playerIds, playerId) {
+  if (!playerIds || !playerId) {
+    return null;
+  }
+  const needle = String(playerId);
+  for (const color of PLAYERS) {
+    if (playerIds[color] === needle) {
+      return color;
+    }
+  }
+  return null;
+}
+
 export function firstHumanColor(controlByColor) {
   for (const color of PLAYERS) {
     if (controlByColor[color] === "human") {

@@ -7,62 +7,58 @@ import {
 } from "../src/lib/gameApi.js";
 
 test("normalizeCreateOptions assigns owner to white when missing", () => {
-  const ownerId = "11111111-1111-4111-8111-111111111111";
-  const options = normalizeCreateOptions(ownerId);
+  const options = normalizeCreateOptions("alice");
 
   assert.deepEqual(options.player_ids, {
-    white: ownerId,
+    white: "alice",
   });
 });
 
 test("normalizeCreateOptions trims player ids", () => {
-  const ownerId = "11111111-1111-4111-8111-111111111111";
-  const options = normalizeCreateOptions(ownerId, {
+  const options = normalizeCreateOptions("alice", {
     playerIdsByColor: {
-      white: " 22222222-2222-4222-8222-222222222222 ",
-      red: " 33333333-3333-4333-8333-333333333333 ",
+      white: "  BOB  ",
+      red: "  CHARLIE ",
       black: "   ",
     },
   });
 
   assert.deepEqual(options.player_ids, {
-    white: "22222222-2222-4222-8222-222222222222",
-    red: "33333333-3333-4333-8333-333333333333",
+    white: "bob",
+    red: "charlie",
   });
 });
 
 test("normalizeCreateOptions keeps additional explicit player assignments", () => {
-  const ownerId = "11111111-1111-4111-8111-111111111111";
-  const options = normalizeCreateOptions(ownerId, {
+  const options = normalizeCreateOptions("alice", {
     playerIdsByColor: {
-      blue: "44444444-4444-4444-8444-444444444444",
+      blue: "david",
     },
   });
 
   assert.deepEqual(options.player_ids, {
-    white: ownerId,
-    blue: "44444444-4444-4444-8444-444444444444",
+    white: "alice",
+    blue: "david",
   });
 });
 
 test("normalizeCreateOptions marks robot seats as occupied", () => {
-  const ownerId = "11111111-1111-4111-8111-111111111111";
-  const options = normalizeCreateOptions(ownerId, {
+  const options = normalizeCreateOptions("alice", {
     controlByColor: {
       red: "robot",
       black: "robot",
     },
     playerIdsByColor: {
-      red: "55555555-5555-4555-8555-555555555555",
-      blue: "66666666-6666-4666-8666-666666666666",
+      red: "someone",
+      blue: "eve",
     },
   });
 
   assert.deepEqual(options.player_ids, {
-    white: ownerId,
+    white: "alice",
     red: "robot",
     black: "robot",
-    blue: "66666666-6666-4666-8666-666666666666",
+    blue: "eve",
   });
 });
 
@@ -72,6 +68,7 @@ test("buildPlayerStatusPayload keeps in_game fields when valid", () => {
     sessionMode: "remote_join",
     currentGameId: " 77777777-7777-4777-8777-777777777777 ",
     currentColor: "blue",
+    username: "Alice 12",
     isOwner: true,
   });
 
@@ -79,6 +76,7 @@ test("buildPlayerStatusPayload keeps in_game fields when valid", () => {
   assert.equal(payload.session_mode, "remote_join");
   assert.equal(payload.current_game_id, "77777777-7777-4777-8777-777777777777");
   assert.equal(payload.current_color, "blue");
+  assert.equal(payload.username, "alice12");
   assert.equal(payload.is_owner, true);
   assert.ok(typeof payload.updated_at === "string");
 });
@@ -89,6 +87,7 @@ test("buildPlayerStatusPayload sanitizes unsupported values", () => {
     sessionMode: "offline",
     currentGameId: "   ",
     currentColor: "green",
+    username: "  ",
     isOwner: true,
   });
 
@@ -96,5 +95,6 @@ test("buildPlayerStatusPayload sanitizes unsupported values", () => {
   assert.equal(payload.session_mode, "local");
   assert.equal(payload.current_game_id, null);
   assert.equal(payload.current_color, null);
+  assert.equal(payload.username, "player");
   assert.equal(payload.is_owner, false);
 });

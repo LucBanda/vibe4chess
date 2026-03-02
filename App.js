@@ -1,11 +1,12 @@
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
     Alert,
     Pressable,
     SafeAreaView,
     StyleSheet,
     Text,
+    TextInput,
     useWindowDimensions,
     View,
 } from "react-native";
@@ -21,6 +22,7 @@ import { chooseRobotMove } from "./src/game/bot.js";
 import { applyMove, createCapturesBy } from "./src/game/engine.js";
 import { computeStats } from "./src/game/stats.js";
 import {
+    colorOfPlayer,
     createPerspectiveCells,
     firstHumanColor,
     freeSeatsOf,
@@ -30,18 +32,18 @@ import {
     clearPlayerStatus,
     createRemoteGame,
     deleteRemoteGame,
+    fetchPlayerStatus,
     fetchRemoteGame,
     getAuthenticatedUserId,
     joinRemoteGame,
     listJoinableGames,
+    subscribeRemoteGame,
     supabaseConfigured,
     syncRemoteGame,
     upsertPlayerStatus,
 } from "./src/lib/gameApi.js";
-import {
-    loadLocalSession,
-    saveLocalSession,
-} from "./src/lib/localSession.js";
+import { normalizeUsername } from "./src/lib/username.js";
+import { getTabUsername, setTabUsername } from "./src/lib/tabUsername.js";
 
 function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
@@ -68,12 +70,15 @@ export default function App() {
     const [selectedJoinGameId, setSelectedJoinGameId] = useState(null);
     const [loadingJoinableGames, setLoadingJoinableGames] = useState(false);
     const [remoteUpdatedAt, setRemoteUpdatedAt] = useState(null);
+    const remoteUpdatedAtRef = useRef(null);
     const [controlByColor, setControlByColor] = useState({
         white: "human",
         red: "human",
         black: "human",
         blue: "human",
     });
+    const [playerUsername, setPlayerUsername] = useState(() => getTabUsername());
+    const normalizedPlayerUsername = normalizeUsername(playerUsername, "player");
 
     const shortSide = Math.min(width, height);
     const stageWidth = Math.max(width - sidebarMeasuredWidth, 220);
@@ -123,46 +128,28 @@ export default function App() {
     );
     const alivePlayers = stats.filter((s) => s.alive).map((s) => s.player);
     const winner = alivePlayers.length === 1 ? alivePlayers[0] : null;
+    const playerColorLabel = PLAYER_LABEL[localPlayerColor] ?? "Inconnue";
+
+    useEffect(() => {
+        remoteUpdatedAtRef.current = remoteUpdatedAt;
+    }, [remoteUpdatedAt]);
 
     const persistPlayerPresence = async ({
-        userId = null,
+        username = playerUsername,
         status = "idle",
         sessionMode = "local",
         currentGameId = null,
         currentColor = null,
         isOwner = false,
     } = {}) => {
-        let resolvedUserId = userId ?? null;
-        if (!resolvedUserId) {
-            try {
-                const previousSession = await loadLocalSession();
-                if (typeof previousSession?.userId === "string") {
-                    resolvedUserId = previousSession.userId;
-                }
-            } catch (error) {
-                console.error("Local session read before save failed", error);
-            }
-        }
-        try {
-            await saveLocalSession({
-                userId: resolvedUserId,
-                status,
-                sessionMode,
-                currentGameId,
-                currentColor,
-                isOwner: Boolean(isOwner),
-                updatedAt: new Date().toISOString(),
-            });
-        } catch (error) {
-            console.error("Local session persistence failed", error);
-        }
-
-        if (!supabaseConfigured || !resolvedUserId) {
+        const normalizedUsername = normalizeUsername(username, "player");
+        if (!supabaseConfigured) {
             return;
         }
 
         try {
             await upsertPlayerStatus({
+                username: normalizedUsername,
                 status,
                 sessionMode,
                 currentGameId,
@@ -175,39 +162,29 @@ export default function App() {
     };
 
     const clearPlayerPresence = async () => {
-        let existingUserId = null;
-        try {
-            const previousSession = await loadLocalSession();
-            if (typeof previousSession?.userId === "string") {
-                existingUserId = previousSession.userId;
-            }
-        } catch (error) {
-            console.error("Local session read before cleanup failed", error);
-        }
-
-        try {
-            await saveLocalSession({
-                userId: existingUserId,
-                status: "idle",
-                sessionMode: "local",
-                currentGameId: null,
-                currentColor: null,
-                isOwner: false,
-                updatedAt: new Date().toISOString(),
-            });
-        } catch (error) {
-            console.error("Local session cleanup failed", error);
-        }
+        const normalizedUsername = normalizeUsername(playerUsername, "player");
 
         if (!supabaseConfigured) {
             return;
         }
 
         try {
-            await clearPlayerStatus();
+            await clearPlayerStatus(normalizedUsername);
         } catch (error) {
             console.error("Remote player status cleanup failed", error);
         }
+    };
+
+    const getRequiredUsername = () => {
+        const normalized = normalizeUsername(playerUsername, "");
+        if (!normalized) {
+            Alert.alert("Joueur", "Saisis un pseudo (lettres/chiffres/_/-).");
+            return null;
+        }
+        if (normalized !== playerUsername) {
+            setPlayerUsername(normalized);
+        }
+        return normalized;
     };
 
     const selectOrMove = (x, y) => {
@@ -276,7 +253,30 @@ export default function App() {
         setCapturesBy(createCapturesBy());
     };
 
+    const applyGameState = (parsedState) => {
+        setBoard(parsedState.board);
+        setTurn(parsedState.turn);
+        setMoveCount(parsedState.moveCount);
+        setCapturesBy(parsedState.capturesBy);
+        setSelected(null);
+    };
+
+    const resetToNoGame = () => {
+        setIsInGame(false);
+        setRemoteGameId(null);
+        setRemoteUpdatedAt(null);
+        setIsRemoteOwner(false);
+        setLocalPlayerColor("white");
+        initializeGame();
+        setSyncMessage("Aucune partie en cours");
+        setSelected(null);
+    };
+
     const startLocalGame = async () => {
+        const username = getRequiredUsername();
+        if (!username) {
+            return;
+        }
         initializeGame();
         setPlayMode("local");
         setRemoteGameId(null);
@@ -286,16 +286,8 @@ export default function App() {
         setLocalPlayerColor(localColor);
         setSyncMessage("Mode local");
         setIsInGame(true);
-        let userId = null;
-        if (supabaseConfigured) {
-            try {
-                userId = await getAuthenticatedUserId();
-            } catch (error) {
-                console.error("Failed to load authenticated user for local mode", error);
-            }
-        }
         void persistPlayerPresence({
-            userId,
+            username,
             status: "in_game",
             sessionMode: "local",
             currentColor: localColor,
@@ -343,8 +335,12 @@ export default function App() {
     };
 
     const onCreateRemote = async () => {
+        const username = getRequiredUsername();
+        if (!username) {
+            return;
+        }
         try {
-            const userId = await getAuthenticatedUserId();
+            await getAuthenticatedUserId();
             const initialState = {
                 board: createInitialBoard(),
                 turn: "white",
@@ -354,23 +350,20 @@ export default function App() {
             };
             const result = await createRemoteGame(initialState, {
                 controlByColor,
-            });
-            setBoard(initialState.board);
-            setTurn(initialState.turn);
-            setMoveCount(initialState.moveCount);
-            setCapturesBy(initialState.capturesBy);
-            setSelected(null);
+            }, username);
+            applyGameState(initialState);
             setRemoteGameId(result.id);
             setRemoteUpdatedAt(result.updated_at ?? null);
             setIsRemoteOwner(true);
-            const localColor = firstHumanColor(controlByColor);
+            const localColor =
+                colorOfPlayer(result.player_ids, normalizedPlayerUsername) ?? "white";
             setLocalPlayerColor(localColor);
             setIsInGame(true);
             setSyncMessage(
                 `Remote: partie créée (${result.id.slice(0, 8)}...)`,
             );
             void persistPlayerPresence({
-                userId,
+                username,
                 status: "in_game",
                 sessionMode: "remote_create",
                 currentGameId: result.id,
@@ -383,13 +376,17 @@ export default function App() {
     };
 
     const onJoinRemote = async () => {
+        const username = getRequiredUsername();
+        if (!username) {
+            return;
+        }
         if (!selectedJoinGameId) {
             Alert.alert("Supabase", "Aucune partie disponible à rejoindre.");
             return;
         }
 
         try {
-            const userId = await getAuthenticatedUserId();
+            await getAuthenticatedUserId();
             const freshRemote = await fetchRemoteGame(selectedJoinGameId);
             const freshFreeSeats = freeSeatsOf(freshRemote.player_ids);
             if (!freshFreeSeats.includes(joinColor)) {
@@ -401,28 +398,36 @@ export default function App() {
                 return;
             }
 
-            const result = await joinRemoteGame(selectedJoinGameId, joinColor);
+            const result = await joinRemoteGame(
+                selectedJoinGameId,
+                joinColor,
+                username,
+            );
             setRemoteGameId(result.id);
             const remoteGame = await fetchRemoteGame(result.id);
             const parsed = parseRemoteState(remoteGame);
-            setBoard(parsed.board);
-            setTurn(parsed.turn);
-            setMoveCount(parsed.moveCount);
-            setCapturesBy(parsed.capturesBy);
-            setSelected(null);
+            const assignedColor =
+                result.assigned_color ??
+                colorOfPlayer(
+                    remoteGame.player_ids,
+                    normalizedPlayerUsername,
+                ) ??
+                joinColor;
+            applyGameState(parsed);
             setRemoteUpdatedAt(remoteGame.updated_at ?? null);
             setIsRemoteOwner(false);
-            setLocalPlayerColor(joinColor);
+            setLocalPlayerColor(assignedColor);
+            setJoinColor(assignedColor);
             setIsInGame(true);
             setSyncMessage(
-                `Remote: inscrit en ${PLAYER_LABEL[joinColor]} (${result.id.slice(0, 8)}...)`,
+                `Remote: inscrit en ${PLAYER_LABEL[assignedColor]} (${result.id.slice(0, 8)}...)`,
             );
             void persistPlayerPresence({
-                userId,
+                username,
                 status: "in_game",
                 sessionMode: "remote_join",
                 currentGameId: result.id,
-                currentColor: joinColor,
+                currentColor: assignedColor,
                 isOwner: false,
             });
             await loadJoinableGames();
@@ -456,14 +461,7 @@ export default function App() {
             }
         }
 
-        setIsInGame(false);
-        setRemoteGameId(null);
-        setRemoteUpdatedAt(null);
-        setIsRemoteOwner(false);
-        setLocalPlayerColor("white");
-        initializeGame();
-        setSyncMessage("Aucune partie en cours");
-        setSelected(null);
+        resetToNoGame();
         void clearPlayerPresence();
     };
 
@@ -499,84 +497,98 @@ export default function App() {
     const canUseRemote = isInGame && playMode !== "local";
 
     useEffect(() => {
+        setTabUsername(normalizedPlayerUsername);
+    }, [normalizedPlayerUsername]);
+
+    useEffect(() => {
+        if (!supabaseConfigured || isInGame) {
+            return undefined;
+        }
+
+        const requestedUsername = normalizeUsername(playerUsername, "");
+        if (!requestedUsername) {
+            return undefined;
+        }
+
         let cancelled = false;
 
-        const restoreLocalSession = async () => {
+        const applyStatus = async () => {
             try {
-                const localSession = await loadLocalSession();
-                if (!localSession || cancelled) {
+                const statusRow = await fetchPlayerStatus(requestedUsername);
+                if (cancelled || !statusRow) {
                     return;
                 }
 
-                if (
-                    typeof localSession.currentColor === "string" &&
-                    PLAYERS.includes(localSession.currentColor)
-                ) {
-                    setJoinColor(localSession.currentColor);
-                    setLocalPlayerColor(localSession.currentColor);
-                }
+                const sessionMode = statusRow.session_mode;
+                const colorFromStatus = PLAYERS.includes(statusRow.current_color)
+                    ? statusRow.current_color
+                    : null;
 
-                if (localSession.status !== "in_game") {
-                    if (localSession.sessionMode === "remote_create") {
-                        setPlayMode("create");
-                    } else if (localSession.sessionMode === "remote_join") {
-                        setPlayMode("join");
-                    } else {
-                        setPlayMode("local");
+                if (statusRow.status !== "in_game") {
+                    setPlayMode(
+                        sessionMode === "remote_create"
+                            ? "create"
+                            : sessionMode === "remote_join"
+                                ? "join"
+                                : "local",
+                    );
+                    if (colorFromStatus) {
+                        setJoinColor(colorFromStatus);
+                        setLocalPlayerColor(colorFromStatus);
                     }
+                    setSyncMessage(`Statut chargé (${requestedUsername})`);
                     return;
                 }
 
-                if (localSession.sessionMode === "local") {
+                if (sessionMode === "local") {
                     initializeGame();
                     setPlayMode("local");
                     setRemoteGameId(null);
                     setRemoteUpdatedAt(null);
                     setIsRemoteOwner(false);
+                    setLocalPlayerColor(colorFromStatus ?? "white");
                     setIsInGame(true);
-                    setSyncMessage("Mode local (restauré)");
+                    setSyncMessage(`Partie locale restaurée (${requestedUsername})`);
                     return;
                 }
 
-                const savedGameId = localSession.currentGameId ?? null;
-                if (!savedGameId || !supabaseConfigured) {
+                const gameId = statusRow.current_game_id;
+                if (!gameId) {
                     return;
                 }
 
-                const remoteGame = await fetchRemoteGame(savedGameId);
+                const remoteGame = await fetchRemoteGame(gameId);
                 if (cancelled) {
                     return;
                 }
-
                 const parsed = parseRemoteState(remoteGame);
-                setBoard(parsed.board);
-                setTurn(parsed.turn);
-                setMoveCount(parsed.moveCount);
-                setCapturesBy(parsed.capturesBy);
-                setSelected(null);
-                setPlayMode(
-                    localSession.sessionMode === "remote_create"
-                        ? "create"
-                        : "join",
-                );
-                setRemoteGameId(savedGameId);
+                const resolvedColor =
+                    colorFromStatus ??
+                    colorOfPlayer(remoteGame.player_ids, requestedUsername) ??
+                    "white";
+
+                applyGameState(parsed);
+                setPlayMode(sessionMode === "remote_create" ? "create" : "join");
+                setRemoteGameId(gameId);
                 setRemoteUpdatedAt(remoteGame.updated_at ?? null);
-                setIsRemoteOwner(Boolean(localSession.isOwner));
+                setIsRemoteOwner(Boolean(statusRow.is_owner));
+                setLocalPlayerColor(resolvedColor);
+                setJoinColor(resolvedColor);
                 setIsInGame(true);
-                setSyncMessage(`Remote: partie restaurée (${savedGameId.slice(0, 8)}...)`);
+                setSyncMessage(`Partie remote restaurée (${requestedUsername})`);
             } catch (error) {
                 if (!cancelled) {
-                    console.error("Local session restore failed", error);
+                    console.error("Player status restore failed", error);
                 }
             }
         };
 
-        void restoreLocalSession();
+        void applyStatus();
 
         return () => {
             cancelled = true;
         };
-    }, [supabaseConfigured]);
+    }, [playerUsername, normalizedPlayerUsername, supabaseConfigured, isInGame]);
 
     useEffect(() => {
         if (!isInGame || winner || controlByColor[turn] !== "robot") {
@@ -649,31 +661,34 @@ export default function App() {
         }
 
         let cancelled = false;
+        let unsubscribe = null;
+        let pullIntervalId = null;
 
-        const pullLatestRemoteState = async () => {
+        const applyRemoteSnapshot = (remoteGame, source = "realtime") => {
+            const nextUpdatedAt = remoteGame?.updated_at ?? null;
+            const previousUpdatedAt = remoteUpdatedAtRef.current;
+            if (
+                nextUpdatedAt &&
+                previousUpdatedAt &&
+                nextUpdatedAt <= previousUpdatedAt
+            ) {
+                return;
+            }
+
+            const parsed = parseRemoteState(remoteGame);
+            applyGameState(parsed);
+            setRemoteUpdatedAt(nextUpdatedAt);
+            setSyncMessage(`Remote: mise à jour reçue (${source})`);
+        };
+
+        const pullInitialRemoteState = async () => {
             try {
                 const remoteGame = await fetchRemoteGame(remoteGameId);
                 if (cancelled) {
                     return;
                 }
 
-                const nextUpdatedAt = remoteGame.updated_at ?? null;
-                if (
-                    nextUpdatedAt &&
-                    remoteUpdatedAt &&
-                    nextUpdatedAt <= remoteUpdatedAt
-                ) {
-                    return;
-                }
-
-                const parsed = parseRemoteState(remoteGame);
-                setBoard(parsed.board);
-                setTurn(parsed.turn);
-                setMoveCount(parsed.moveCount);
-                setCapturesBy(parsed.capturesBy);
-                setSelected(null);
-                setRemoteUpdatedAt(nextUpdatedAt);
-                setSyncMessage("Remote: mise à jour reçue");
+                applyRemoteSnapshot(remoteGame, "fetch");
             } catch (error) {
                 if (!cancelled) {
                     console.error("Remote pull failed", error);
@@ -681,16 +696,58 @@ export default function App() {
             }
         };
 
-        void pullLatestRemoteState();
-        const intervalId = setInterval(() => {
-            void pullLatestRemoteState();
-        }, 2000);
+        void pullInitialRemoteState();
+        pullIntervalId = setInterval(() => {
+            void pullInitialRemoteState();
+        }, 1200);
+
+        try {
+            unsubscribe = subscribeRemoteGame(remoteGameId, {
+                onStatus: (status) => {
+                    if (cancelled) {
+                        return;
+                    }
+                    if (status === "SUBSCRIBED") {
+                        setSyncMessage("Remote: abonnement temps réel actif");
+                    } else if (
+                        status === "CHANNEL_ERROR" ||
+                        status === "TIMED_OUT" ||
+                        status === "CLOSED"
+                    ) {
+                        setSyncMessage("Remote: fallback polling actif");
+                    }
+                },
+                onChange: ({ eventType, row }) => {
+                    if (cancelled) {
+                        return;
+                    }
+
+                    if (eventType === "DELETE") {
+                        resetToNoGame();
+                        setSyncMessage("Remote: partie supprimée");
+                        void clearPlayerPresence();
+                        return;
+                    }
+
+                    if (eventType === "UPDATE" && row) {
+                        applyRemoteSnapshot(row, "realtime");
+                    }
+                },
+            });
+        } catch (error) {
+            console.error("Remote realtime subscribe failed", error);
+        }
 
         return () => {
             cancelled = true;
-            clearInterval(intervalId);
+            if (pullIntervalId) {
+                clearInterval(pullIntervalId);
+            }
+            if (typeof unsubscribe === "function") {
+                void unsubscribe();
+            }
         };
-    }, [isInGame, playMode, remoteGameId, remoteUpdatedAt, supabaseConfigured]);
+    }, [isInGame, playMode, remoteGameId, supabaseConfigured]);
 
     return (
         <SafeAreaView style={styles.page}>
@@ -752,6 +809,28 @@ export default function App() {
                                 },
                             ]}
                         >
+                            Joueur: {normalizedPlayerUsername}
+                        </Text>
+                        <Text
+                            style={[
+                                styles.cornerSub,
+                                {
+                                    fontSize: subFontSize,
+                                    marginTop: lineSpacing,
+                                },
+                            ]}
+                        >
+                            Ma couleur: {playerColorLabel}
+                        </Text>
+                        <Text
+                            style={[
+                                styles.cornerSub,
+                                {
+                                    fontSize: subFontSize,
+                                    marginTop: lineSpacing,
+                                },
+                            ]}
+                        >
                             Coups: {moveCount}
                         </Text>
                         {!isInGame ? (
@@ -767,6 +846,34 @@ export default function App() {
                                 >
                                     Mode de jeu
                                 </Text>
+                                <Text
+                                    style={[
+                                        styles.cornerSub,
+                                        {
+                                            fontSize: subFontSize,
+                                            marginTop: lineSpacing * 2,
+                                        },
+                                    ]}
+                                >
+                                    Nom du joueur
+                                </Text>
+                                <TextInput
+                                    style={[
+                                        styles.usernameInput,
+                                        {
+                                            marginTop: lineSpacing,
+                                        },
+                                    ]}
+                                    value={playerUsername}
+                                    onChangeText={(text) => {
+                                        setPlayerUsername(text);
+                                    }}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                    maxLength={32}
+                                    placeholder="ex: alice"
+                                    placeholderTextColor="#94a3b8"
+                                />
                                 <View
                                     style={[
                                         styles.visibilityRow,
@@ -1404,6 +1511,16 @@ const styles = StyleSheet.create({
     },
     visibilityRow: {
         flexDirection: "row",
+    },
+    usernameInput: {
+        backgroundColor: "#1f2937",
+        borderWidth: 1,
+        borderColor: "rgba(148, 163, 184, 0.4)",
+        borderRadius: 6,
+        paddingVertical: 8,
+        paddingHorizontal: 10,
+        color: "#f8fafc",
+        fontSize: 13,
     },
     visibilityButton: {
         flex: 1,
