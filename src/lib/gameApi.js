@@ -1,6 +1,7 @@
 import { supabase, supabaseConfigured } from "./supabase";
 
 const LOG_PREFIX = "[supabase][gameApi]";
+const VISIBILITIES = new Set(["public", "private"]);
 
 function asPayload(gameState) {
     if (typeof gameState?.fen === "function") {
@@ -107,16 +108,45 @@ async function ensureAuthenticatedUserId() {
     return userId;
 }
 
-export async function createRemoteGame(gameState) {
+function buildCreateOptions(ownerId, options) {
+    const requestedVisibility = options?.visibility ?? "private";
+    const visibility = VISIBILITIES.has(requestedVisibility)
+        ? requestedVisibility
+        : "private";
+    const rawPlayerIds = options?.playerIdsByColor ?? {};
+    const playerIds = {};
+
+    for (const [color, candidate] of Object.entries(rawPlayerIds)) {
+        const trimmed = typeof candidate === "string" ? candidate.trim() : "";
+        if (trimmed) {
+            playerIds[color] = trimmed;
+        }
+    }
+
+    if (!playerIds.white) {
+        playerIds.white = ownerId;
+    }
+
+    return {
+        visibility,
+        player_ids: playerIds,
+    };
+}
+
+export async function createRemoteGame(gameState, options = {}) {
     console.log(`${LOG_PREFIX} createRemoteGame:start`);
     const userId = await ensureAuthenticatedUserId();
+    const createOptions = buildCreateOptions(userId, options);
     const payload = {
         ...asPayload(gameState),
         owner_id: userId,
+        ...createOptions,
         created_at: new Date().toISOString(),
     };
     console.log(`${LOG_PREFIX} createRemoteGame:insert`, {
         ownerId: userId,
+        visibility: payload.visibility,
+        playerIds: payload.player_ids,
         turn: payload.turn,
         status: payload.status,
         fenLength: payload.fen?.length,
@@ -125,7 +155,7 @@ export async function createRemoteGame(gameState) {
     const { data, error } = await supabase
         .from("chess_games")
         .insert(payload)
-        .select("id")
+        .select("id, visibility, player_ids")
         .single();
 
     if (error) {
@@ -144,12 +174,11 @@ export async function createRemoteGame(gameState) {
 }
 
 export async function syncRemoteGame(gameId, gameState) {
-    const userId = await ensureAuthenticatedUserId();
+    await ensureAuthenticatedUserId();
     const { error } = await supabase
         .from("chess_games")
         .update(asPayload(gameState))
-        .eq("id", gameId)
-        .eq("owner_id", userId);
+        .eq("id", gameId);
 
     if (error) {
         throw new Error(`Synchronisation impossible: ${error.message}`);

@@ -6,11 +6,13 @@ import {
     SafeAreaView,
     StyleSheet,
     Text,
+    TextInput,
     useWindowDimensions,
     View,
 } from "react-native";
 import {
     BOARD_SIZE,
+    PLAYERS,
     PLAYER_COLOR,
     PLAYER_LABEL,
     PIECE_SYMBOL,
@@ -39,6 +41,13 @@ export default function App() {
     });
     const [remoteGameId, setRemoteGameId] = useState(null);
     const [syncMessage, setSyncMessage] = useState("Remote: non synchronisé");
+    const [remoteVisibility, setRemoteVisibility] = useState("private");
+    const [playerIdsByColor, setPlayerIdsByColor] = useState({
+        white: "",
+        red: "",
+        black: "",
+        blue: "",
+    });
 
     const shortSide = Math.min(width, height);
     const sidebarWidth = clamp(Math.floor(width * 0.2), 120, 240);
@@ -151,14 +160,24 @@ export default function App() {
                 moveCount,
                 capturesBy,
                 winner,
+            }, {
+                visibility: remoteVisibility,
+                playerIdsByColor,
             });
             setRemoteGameId(result.id);
             setSyncMessage(
-                `Remote: partie créée (${result.id.slice(0, 8)}...)`,
+                `Remote: partie créée ${result.visibility === "public" ? "publique" : "privée"} (${result.id.slice(0, 8)}...)`,
             );
         } catch (error) {
             Alert.alert("Supabase", error.message);
         }
+    };
+
+    const updatePlayerId = (color, value) => {
+        setPlayerIdsByColor((previous) => ({
+            ...previous,
+            [color]: value,
+        }));
     };
 
     const onSyncRemote = async () => {
@@ -267,6 +286,91 @@ export default function App() {
                                 Nouvelle partie
                             </Text>
                         </Pressable>
+
+                        <Text
+                            style={[
+                                styles.cornerSub,
+                                {
+                                    fontSize: subFontSize,
+                                    marginTop: lineSpacing * 2,
+                                },
+                            ]}
+                        >
+                            Visibilité
+                        </Text>
+                        <View
+                            style={[
+                                styles.visibilityRow,
+                                { marginTop: lineSpacing, gap: lineSpacing },
+                            ]}
+                        >
+                            <Pressable
+                                style={[
+                                    styles.visibilityButton,
+                                    remoteVisibility === "private"
+                                        ? styles.visibilityButtonActive
+                                        : null,
+                                ]}
+                                onPress={() => setRemoteVisibility("private")}
+                            >
+                                <Text style={styles.visibilityText}>
+                                    Privée
+                                </Text>
+                            </Pressable>
+                            <Pressable
+                                style={[
+                                    styles.visibilityButton,
+                                    remoteVisibility === "public"
+                                        ? styles.visibilityButtonActive
+                                        : null,
+                                ]}
+                                onPress={() => setRemoteVisibility("public")}
+                            >
+                                <Text style={styles.visibilityText}>
+                                    Publique
+                                </Text>
+                            </Pressable>
+                        </View>
+
+                        <Text
+                            style={[
+                                styles.cornerSub,
+                                {
+                                    fontSize: subFontSize,
+                                    marginTop: lineSpacing * 2,
+                                },
+                            ]}
+                        >
+                            Joueurs (UUID Supabase)
+                        </Text>
+                        {PLAYERS.map((color) => (
+                            <View
+                                key={color}
+                                style={[
+                                    styles.playerInputRow,
+                                    { marginTop: lineSpacing },
+                                ]}
+                            >
+                                <Text style={styles.playerInputLabel}>
+                                    {PLAYER_LABEL[color]}
+                                </Text>
+                                <TextInput
+                                    style={styles.playerInput}
+                                    value={playerIdsByColor[color]}
+                                    onChangeText={(value) =>
+                                        updatePlayerId(color, value)
+                                    }
+                                    placeholder={
+                                        color === "white"
+                                            ? "vide = créateur"
+                                            : "UUID joueur"
+                                    }
+                                    placeholderTextColor="#94a3b8"
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                />
+                            </View>
+                        ))}
 
                         <Pressable
                             style={[
@@ -756,6 +860,49 @@ const styles = StyleSheet.create({
     },
     menuButtonSecondary: {
         backgroundColor: "#374151",
+    },
+    visibilityRow: {
+        flexDirection: "row",
+    },
+    visibilityButton: {
+        flex: 1,
+        backgroundColor: "#1f2937",
+        borderWidth: 1,
+        borderColor: "rgba(148, 163, 184, 0.4)",
+        borderRadius: 6,
+        paddingVertical: 8,
+        paddingHorizontal: 10,
+    },
+    visibilityButtonActive: {
+        backgroundColor: "#2563eb",
+        borderColor: "#60a5fa",
+    },
+    visibilityText: {
+        color: "#e5e7eb",
+        textAlign: "center",
+        fontWeight: "600",
+    },
+    playerInputRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+    },
+    playerInputLabel: {
+        width: 44,
+        color: "#d1d5db",
+        fontSize: 12,
+        fontWeight: "600",
+    },
+    playerInput: {
+        flex: 1,
+        backgroundColor: "#0f172a",
+        borderWidth: 1,
+        borderColor: "rgba(148, 163, 184, 0.35)",
+        color: "#f8fafc",
+        borderRadius: 6,
+        paddingHorizontal: 8,
+        paddingVertical: 6,
+        fontSize: 12,
     },
     resetText: {
         color: "#fff",
