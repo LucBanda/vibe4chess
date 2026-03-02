@@ -20,7 +20,7 @@ Puis lancez:
 
 ```env
 EXPO_PUBLIC_SUPABASE_URL=...
-EXPO_PUBLIC_SUPABASE_ANON_KEY=...
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
 ```
 
 ## Configuration Supabase
@@ -33,7 +33,7 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=...
 
 ## Sécurité Supabase (important)
 
-- La clé `EXPO_PUBLIC_SUPABASE_ANON_KEY` est publique par design et peut être exposée côté client.
+- La clé `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` est publique par design et peut être exposée côté client.
 - Ne mettez jamais la clé `service_role` dans le frontend.
 - Les accès DB sont protégés par RLS dans `supabase/schema.sql`:
   - lecture/écriture limitées au propriétaire (`owner_id = auth.uid()`)
