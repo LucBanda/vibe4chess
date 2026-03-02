@@ -275,6 +275,10 @@ export async function listJoinableGames() {
     });
 }
 
+export async function getAuthenticatedUserId() {
+    return ensureAuthenticatedUserId();
+}
+
 export async function deleteRemoteGame(gameId) {
     await ensureAuthenticatedUserId();
     const trimmedGameId = gameId?.trim();

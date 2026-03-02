@@ -16,7 +16,7 @@ import {
     PLAYER_LABEL,
     PIECE_SYMBOL,
 } from "./src/game/constants.js";
-import { buildCells, createInitialBoard, keyOf } from "./src/game/board.js";
+import { createInitialBoard, isPlayable, keyOf } from "./src/game/board.js";
 import { chooseRobotMove } from "./src/game/bot.js";
 import { applyMove, createCapturesBy } from "./src/game/engine.js";
 import { computeStats } from "./src/game/stats.js";
@@ -24,6 +24,7 @@ import {
     createRemoteGame,
     deleteRemoteGame,
     fetchRemoteGame,
+    getAuthenticatedUserId,
     joinRemoteGame,
     listJoinableGames,
     supabaseConfigured,
@@ -78,6 +79,31 @@ function freeSeatsOf(playerIds) {
     return PLAYERS.filter((color) => !playerIds?.[color]);
 }
 
+function firstHumanColor(controlByColor) {
+    for (const color of PLAYERS) {
+        if (controlByColor[color] === "human") {
+            return color;
+        }
+    }
+    return "white";
+}
+
+function displayToBoard(x, y, perspectiveColor) {
+    if (perspectiveColor === "red") {
+        return { x: BOARD_SIZE - 1 - y, y: x };
+    }
+    if (perspectiveColor === "black") {
+        return {
+            x: BOARD_SIZE - 1 - x,
+            y: BOARD_SIZE - 1 - y,
+        };
+    }
+    if (perspectiveColor === "blue") {
+        return { x: y, y: BOARD_SIZE - 1 - x };
+    }
+    return { x, y };
+}
+
 export default function App() {
     const { width, height } = useWindowDimensions();
     const [sidebarMeasuredWidth, setSidebarMeasuredWidth] = useState(0);
@@ -92,6 +118,7 @@ export default function App() {
     const [playMode, setPlayMode] = useState("local");
     const [remoteGameId, setRemoteGameId] = useState(null);
     const [isRemoteOwner, setIsRemoteOwner] = useState(false);
+    const [localPlayerColor, setLocalPlayerColor] = useState("white");
     const [syncMessage, setSyncMessage] = useState("Remote: non synchronisé");
     const [joinColor, setJoinColor] = useState("white");
     const [joinableGames, setJoinableGames] = useState([]);
@@ -143,7 +170,26 @@ export default function App() {
     const lineSpacing = clamp(Math.floor(shortSide * 0.006), 3, 8);
     const stageGap = clamp(Math.floor(shortSide * 0.012), 6, 14);
 
-    const cells = useMemo(() => buildCells(board), [board]);
+    const cells = useMemo(() => {
+        const nextCells = [];
+
+        for (let y = 0; y < BOARD_SIZE; y += 1) {
+            for (let x = 0; x < BOARD_SIZE; x += 1) {
+                const boardPos = displayToBoard(x, y, localPlayerColor);
+                nextCells.push({
+                    x,
+                    y,
+                    boardX: boardPos.x,
+                    boardY: boardPos.y,
+                    playable: isPlayable(boardPos.x, boardPos.y),
+                    piece: board[keyOf(boardPos.x, boardPos.y)] ?? null,
+                    isLight: (boardPos.x + boardPos.y) % 2 === 0,
+                });
+            }
+        }
+
+        return nextCells;
+    }, [board, localPlayerColor]);
     const stats = useMemo(
         () => computeStats(board, capturesBy),
         [board, capturesBy],
@@ -220,6 +266,7 @@ export default function App() {
         setRemoteGameId(null);
         setRemoteUpdatedAt(null);
         setIsRemoteOwner(false);
+        setLocalPlayerColor(firstHumanColor(controlByColor));
         setSyncMessage("Mode local");
         setIsInGame(true);
     };
@@ -265,6 +312,7 @@ export default function App() {
 
     const onCreateRemote = async () => {
         try {
+            await getAuthenticatedUserId();
             const initialState = {
                 board: createInitialBoard(),
                 turn: "white",
@@ -283,6 +331,7 @@ export default function App() {
             setRemoteGameId(result.id);
             setRemoteUpdatedAt(result.updated_at ?? null);
             setIsRemoteOwner(true);
+            setLocalPlayerColor(firstHumanColor(controlByColor));
             setIsInGame(true);
             setSyncMessage(
                 `Remote: partie créée (${result.id.slice(0, 8)}...)`,
@@ -299,6 +348,7 @@ export default function App() {
         }
 
         try {
+            await getAuthenticatedUserId();
             const freshRemote = await fetchRemoteGame(selectedJoinGameId);
             const freshFreeSeats = freeSeatsOf(freshRemote.player_ids);
             if (!freshFreeSeats.includes(joinColor)) {
@@ -321,9 +371,10 @@ export default function App() {
             setSelected(null);
             setRemoteUpdatedAt(remoteGame.updated_at ?? null);
             setIsRemoteOwner(false);
+            setLocalPlayerColor(joinColor);
             setIsInGame(true);
             setSyncMessage(
-                `Remote: inscrit en ${PLAYER_LABEL[result.assigned_color ?? joinColor]} (${result.id.slice(0, 8)}...)`,
+                `Remote: inscrit en ${PLAYER_LABEL[joinColor]} (${result.id.slice(0, 8)}...)`,
             );
             await loadJoinableGames();
         } catch (error) {
@@ -360,6 +411,7 @@ export default function App() {
         setRemoteGameId(null);
         setRemoteUpdatedAt(null);
         setIsRemoteOwner(false);
+        setLocalPlayerColor("white");
         initializeGame();
         setSyncMessage("Aucune partie en cours");
         setSelected(null);
@@ -970,12 +1022,22 @@ export default function App() {
                                 },
                             ]}
                         >
-                            {cells.map(({ x, y, playable, piece, isLight }) => {
+                            {cells.map(
+                                ({
+                                    x,
+                                    y,
+                                    boardX,
+                                    boardY,
+                                    playable,
+                                    piece,
+                                    isLight,
+                                }) => {
                                 const isSelected =
-                                    selected?.x === x && selected?.y === y;
+                                    selected?.x === boardX &&
+                                    selected?.y === boardY;
                                 return (
                                     <Pressable
-                                        key={keyOf(x, y)}
+                                        key={`${x},${y}`}
                                         style={[
                                             styles.square,
                                             {
@@ -993,7 +1055,7 @@ export default function App() {
                                         ]}
                                         onPress={() => {
                                             if (playable) {
-                                                selectOrMove(x, y);
+                                                selectOrMove(boardX, boardY);
                                             }
                                         }}
                                     >
@@ -1021,7 +1083,8 @@ export default function App() {
                                         ) : null}
                                     </Pressable>
                                 );
-                            })}
+                                },
+                            )}
                         </View>
                     </View>
 
