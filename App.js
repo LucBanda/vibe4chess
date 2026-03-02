@@ -23,12 +23,59 @@ import { applyMove, createCapturesBy } from "./src/game/engine.js";
 import { computeStats } from "./src/game/stats.js";
 import {
     createRemoteGame,
+    fetchRemoteGame,
+    joinRemoteGame,
+    listJoinableGames,
     supabaseConfigured,
     syncRemoteGame,
 } from "./src/lib/gameApi.js";
 
 function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
+}
+
+function parseRemoteState(row) {
+    let board = {};
+    let moveCount = 0;
+    let capturesBy = createCapturesBy();
+    let winner = null;
+
+    try {
+        const fenPayload = JSON.parse(row.fen);
+        if (fenPayload?.board && typeof fenPayload.board === "object") {
+            board = fenPayload.board;
+        }
+    } catch {
+        board = {};
+    }
+
+    try {
+        const pgnPayload = JSON.parse(row.pgn);
+        moveCount = Number.isFinite(pgnPayload?.moveCount)
+            ? pgnPayload.moveCount
+            : 0;
+        capturesBy = {
+            ...createCapturesBy(),
+            ...(pgnPayload?.capturesBy ?? {}),
+        };
+        winner = pgnPayload?.winner ?? null;
+    } catch {
+        moveCount = 0;
+        capturesBy = createCapturesBy();
+        winner = null;
+    }
+
+    return {
+        board,
+        turn: row.turn,
+        moveCount,
+        capturesBy,
+        winner,
+    };
+}
+
+function freeSeatsOf(playerIds) {
+    return PLAYERS.filter((color) => !playerIds?.[color]);
 }
 
 export default function App() {
@@ -42,13 +89,18 @@ export default function App() {
     });
     const [remoteGameId, setRemoteGameId] = useState(null);
     const [syncMessage, setSyncMessage] = useState("Remote: non synchronisé");
-    const [remoteVisibility, setRemoteVisibility] = useState("private");
+    const [remoteClientMode, setRemoteClientMode] = useState("create");
     const [playerIdsByColor, setPlayerIdsByColor] = useState({
         white: "",
         red: "",
         black: "",
         blue: "",
     });
+    const [joinColor, setJoinColor] = useState("white");
+    const [joinableGames, setJoinableGames] = useState([]);
+    const [selectedJoinGameId, setSelectedJoinGameId] = useState(null);
+    const [loadingJoinableGames, setLoadingJoinableGames] = useState(false);
+    const [remoteUpdatedAt, setRemoteUpdatedAt] = useState(null);
     const [controlByColor, setControlByColor] = useState({
         white: "human",
         red: "human",
@@ -151,6 +203,7 @@ export default function App() {
         setTurn(result.state.turn);
         setMoveCount(result.state.moveCount);
         setSelected(null);
+        void syncLocalStateToRemote(result.state, "coup joueur");
     };
 
     const resetGame = () => {
@@ -160,6 +213,45 @@ export default function App() {
         setMoveCount(0);
         setCapturesBy(createCapturesBy());
         setSyncMessage("Remote: partie réinitialisée localement");
+    };
+
+    const syncLocalStateToRemote = async (nextState, reason = "sync") => {
+        if (!remoteGameId) {
+            return;
+        }
+
+        try {
+            const syncResult = await syncRemoteGame(remoteGameId, nextState);
+            if (syncResult?.updated_at) {
+                setRemoteUpdatedAt(syncResult.updated_at);
+            }
+            setSyncMessage(`Remote: ${reason} synchronisé`);
+        } catch (error) {
+            setSyncMessage(`Remote: échec ${reason}`);
+            console.error("Remote sync failed", error);
+        }
+    };
+
+    const loadJoinableGames = async () => {
+        if (!supabaseConfigured) {
+            return;
+        }
+
+        setLoadingJoinableGames(true);
+        try {
+            const games = await listJoinableGames();
+            setJoinableGames(games);
+
+            if (games.length === 0) {
+                setSelectedJoinGameId(null);
+            } else if (!games.some((game) => game.id === selectedJoinGameId)) {
+                setSelectedJoinGameId(games[0].id);
+            }
+        } catch (error) {
+            Alert.alert("Supabase", error.message);
+        } finally {
+            setLoadingJoinableGames(false);
+        }
     };
 
     const onCreateRemote = async () => {
@@ -172,12 +264,45 @@ export default function App() {
                 capturesBy,
                 winner,
             }, {
-                visibility: remoteVisibility,
                 playerIdsByColor,
+                controlByColor,
             });
             setRemoteGameId(result.id);
+            setRemoteUpdatedAt(result.updated_at ?? null);
             setSyncMessage(
-                `Remote: partie créée ${result.visibility === "public" ? "publique" : "privée"} (${result.id.slice(0, 8)}...)`,
+                `Remote: partie créée (${result.id.slice(0, 8)}...)`,
+            );
+        } catch (error) {
+            Alert.alert("Supabase", error.message);
+        }
+    };
+
+    const onJoinRemote = async () => {
+        if (!selectedJoinGameId) {
+            Alert.alert("Supabase", "Aucune partie disponible à rejoindre.");
+            return;
+        }
+        if (!selectedJoinGameFreeSeats.includes(joinColor)) {
+            Alert.alert(
+                "Supabase",
+                "La couleur sélectionnée est déjà occupée sur cette partie.",
+            );
+            return;
+        }
+
+        try {
+            const result = await joinRemoteGame(selectedJoinGameId, joinColor);
+            setRemoteGameId(result.id);
+            const remoteGame = await fetchRemoteGame(result.id);
+            const parsed = parseRemoteState(remoteGame);
+            setBoard(parsed.board);
+            setTurn(parsed.turn);
+            setMoveCount(parsed.moveCount);
+            setCapturesBy(parsed.capturesBy);
+            setSelected(null);
+            setRemoteUpdatedAt(remoteGame.updated_at ?? null);
+            setSyncMessage(
+                `Remote: inscrit en ${PLAYER_LABEL[result.assigned_color ?? joinColor]} (${result.id.slice(0, 8)}...)`,
             );
         } catch (error) {
             Alert.alert("Supabase", error.message);
@@ -221,6 +346,9 @@ export default function App() {
     const redStats = stats.find((s) => s.player === "red");
     const blackStats = stats.find((s) => s.player === "black");
     const blueStats = stats.find((s) => s.player === "blue");
+    const selectedJoinGame =
+        joinableGames.find((game) => game.id === selectedJoinGameId) ?? null;
+    const selectedJoinGameFreeSeats = freeSeatsOf(selectedJoinGame?.player_ids);
 
     useEffect(() => {
         if (winner || controlByColor[turn] !== "robot") {
@@ -269,6 +397,7 @@ export default function App() {
             setTurn(result.state.turn);
             setMoveCount(result.state.moveCount);
             setSelected(null);
+            void syncLocalStateToRemote(result.state, "coup robot");
             setSyncMessage(
                 `Robot ${PLAYER_LABEL[turn]}: (${botMove.fromX},${botMove.fromY}) -> (${botMove.toX},${botMove.toY})`,
             );
@@ -276,6 +405,61 @@ export default function App() {
 
         return () => clearTimeout(timerId);
     }, [board, turn, moveCount, capturesBy, winner, controlByColor]);
+
+    useEffect(() => {
+        if (remoteClientMode === "join") {
+            void loadJoinableGames();
+        }
+    }, [remoteClientMode, supabaseConfigured]);
+
+    useEffect(() => {
+        if (!remoteGameId || !supabaseConfigured) {
+            return undefined;
+        }
+
+        let cancelled = false;
+
+        const pullLatestRemoteState = async () => {
+            try {
+                const remoteGame = await fetchRemoteGame(remoteGameId);
+                if (cancelled) {
+                    return;
+                }
+
+                const nextUpdatedAt = remoteGame.updated_at ?? null;
+                if (
+                    nextUpdatedAt &&
+                    remoteUpdatedAt &&
+                    nextUpdatedAt <= remoteUpdatedAt
+                ) {
+                    return;
+                }
+
+                const parsed = parseRemoteState(remoteGame);
+                setBoard(parsed.board);
+                setTurn(parsed.turn);
+                setMoveCount(parsed.moveCount);
+                setCapturesBy(parsed.capturesBy);
+                setSelected(null);
+                setRemoteUpdatedAt(nextUpdatedAt);
+                setSyncMessage("Remote: mise à jour reçue");
+            } catch (error) {
+                if (!cancelled) {
+                    console.error("Remote pull failed", error);
+                }
+            }
+        };
+
+        void pullLatestRemoteState();
+        const intervalId = setInterval(() => {
+            void pullLatestRemoteState();
+        }, 2000);
+
+        return () => {
+            cancelled = true;
+            clearInterval(intervalId);
+        };
+    }, [remoteGameId, remoteUpdatedAt, supabaseConfigured]);
 
     return (
         <SafeAreaView style={styles.page}>
@@ -369,7 +553,7 @@ export default function App() {
                                 },
                             ]}
                         >
-                            Visibilité
+                            Client
                         </Text>
                         <View
                             style={[
@@ -380,70 +564,190 @@ export default function App() {
                             <Pressable
                                 style={[
                                     styles.visibilityButton,
-                                    remoteVisibility === "private"
+                                    remoteClientMode === "create"
                                         ? styles.visibilityButtonActive
                                         : null,
                                 ]}
-                                onPress={() => setRemoteVisibility("private")}
+                                onPress={() => setRemoteClientMode("create")}
                             >
                                 <Text style={styles.visibilityText}>
-                                    Privée
+                                    Créer
                                 </Text>
                             </Pressable>
                             <Pressable
                                 style={[
                                     styles.visibilityButton,
-                                    remoteVisibility === "public"
+                                    remoteClientMode === "join"
                                         ? styles.visibilityButtonActive
                                         : null,
                                 ]}
-                                onPress={() => setRemoteVisibility("public")}
+                                onPress={() => setRemoteClientMode("join")}
                             >
                                 <Text style={styles.visibilityText}>
-                                    Publique
+                                    S'inscrire
                                 </Text>
                             </Pressable>
                         </View>
 
-                        <Text
-                            style={[
-                                styles.cornerSub,
-                                {
-                                    fontSize: subFontSize,
-                                    marginTop: lineSpacing * 2,
-                                },
-                            ]}
-                        >
-                            Joueurs (UUID Supabase)
-                        </Text>
-                        {PLAYERS.map((color) => (
-                            <View
-                                key={color}
-                                style={[
-                                    styles.playerInputRow,
-                                    { marginTop: lineSpacing },
-                                ]}
-                            >
-                                <Text style={styles.playerInputLabel}>
-                                    {PLAYER_LABEL[color]}
+                        {remoteClientMode === "create" ? (
+                            <>
+                                <Text
+                                    style={[
+                                        styles.cornerSub,
+                                        {
+                                            fontSize: subFontSize,
+                                            marginTop: lineSpacing * 2,
+                                        },
+                                    ]}
+                                >
+                                    Joueurs (UUID Supabase)
                                 </Text>
-                                <TextInput
-                                    style={styles.playerInput}
-                                    value={playerIdsByColor[color]}
-                                    onChangeText={(value) =>
-                                        updatePlayerId(color, value)
-                                    }
-                                    placeholder={
-                                        color === "white"
-                                            ? "vide = créateur"
-                                            : "UUID joueur"
-                                    }
-                                    placeholderTextColor="#94a3b8"
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                />
-                            </View>
-                        ))}
+                                {PLAYERS.map((color) => (
+                                    <View
+                                        key={color}
+                                        style={[
+                                            styles.playerInputRow,
+                                            { marginTop: lineSpacing },
+                                        ]}
+                                    >
+                                        <Text style={styles.playerInputLabel}>
+                                            {PLAYER_LABEL[color]}
+                                        </Text>
+                                        <TextInput
+                                            style={styles.playerInput}
+                                            value={playerIdsByColor[color]}
+                                            onChangeText={(value) =>
+                                                updatePlayerId(color, value)
+                                            }
+                                            placeholder={
+                                                color === "white"
+                                                    ? "vide = créateur"
+                                                    : "UUID joueur"
+                                            }
+                                            placeholderTextColor="#94a3b8"
+                                            autoCapitalize="none"
+                                            autoCorrect={false}
+                                        />
+                                    </View>
+                                ))}
+                            </>
+                        ) : (
+                            <>
+                                <Text
+                                    style={[
+                                        styles.cornerSub,
+                                        {
+                                            fontSize: subFontSize,
+                                            marginTop: lineSpacing * 2,
+                                        },
+                                    ]}
+                                >
+                                    Partie existante
+                                </Text>
+                                <View
+                                    style={[
+                                        styles.joinableGamesContainer,
+                                        { marginTop: lineSpacing, gap: lineSpacing },
+                                    ]}
+                                >
+                                    {joinableGames.map((game) => {
+                                        const freeSeats = freeSeatsOf(game.player_ids);
+                                        return (
+                                            <Pressable
+                                                key={game.id}
+                                                style={[
+                                                    styles.joinableGameButton,
+                                                    selectedJoinGameId === game.id
+                                                        ? styles.visibilityButtonActive
+                                                        : null,
+                                                ]}
+                                                onPress={() =>
+                                                    setSelectedJoinGameId(game.id)
+                                                }
+                                            >
+                                                <Text style={styles.joinableGameTitle}>
+                                                    {game.id.slice(0, 8)}...
+                                                </Text>
+                                                <Text style={styles.joinableGameSub}>
+                                                    Places libres:{" "}
+                                                    {freeSeats.map(
+                                                        (color) =>
+                                                            PLAYER_LABEL[color],
+                                                    ).join(", ")}
+                                                </Text>
+                                            </Pressable>
+                                        );
+                                    })}
+                                    {joinableGames.length === 0 ? (
+                                        <Text style={styles.cornerSub}>
+                                            Aucune partie joignable.
+                                        </Text>
+                                    ) : null}
+                                    <Pressable
+                                        style={styles.refreshJoinablesButton}
+                                        onPress={loadJoinableGames}
+                                    >
+                                        <Text style={styles.resetText}>
+                                            {loadingJoinableGames
+                                                ? "Chargement..."
+                                                : "Rafraîchir la liste"}
+                                        </Text>
+                                    </Pressable>
+                                </View>
+                                <Text
+                                    style={[
+                                        styles.cornerSub,
+                                        {
+                                            fontSize: subFontSize,
+                                            marginTop: lineSpacing * 2,
+                                        },
+                                    ]}
+                                >
+                                    Couleur à rejoindre
+                                </Text>
+                                <View
+                                    style={[
+                                        styles.visibilityRow,
+                                        {
+                                            marginTop: lineSpacing,
+                                            gap: lineSpacing,
+                                            flexWrap: "wrap",
+                                        },
+                                    ]}
+                                >
+                                    {PLAYERS.map((color) => {
+                                        const isSeatFree =
+                                            selectedJoinGameFreeSeats.includes(
+                                                color,
+                                            );
+
+                                        return (
+                                            <Pressable
+                                                key={`join-${color}`}
+                                                style={[
+                                                    styles.joinColorButton,
+                                                    joinColor === color
+                                                        ? styles.visibilityButtonActive
+                                                        : null,
+                                                    !isSeatFree
+                                                        ? styles.joinColorButtonDisabled
+                                                        : null,
+                                                ]}
+                                                onPress={() => {
+                                                    if (isSeatFree) {
+                                                        setJoinColor(color);
+                                                    }
+                                                }}
+                                            >
+                                                <Text style={styles.visibilityText}>
+                                                    {PLAYER_LABEL[color]}
+                                                </Text>
+                                            </Pressable>
+                                        );
+                                    })}
+                                </View>
+                            </>
+                        )}
 
                         <Text
                             style={[
@@ -502,33 +806,63 @@ export default function App() {
                             </View>
                         ))}
 
-                        <Pressable
-                            style={[
-                                styles.menuButtonSecondary,
-                                {
-                                    marginTop: lineSpacing,
-                                    paddingVertical: resetButtonVerticalPadding,
-                                    paddingHorizontal:
-                                        resetButtonHorizontalPadding,
-                                    borderRadius: clamp(
-                                        Math.floor(panelRadius * 0.7),
-                                        5,
-                                        10,
-                                    ),
-                                },
-                            ]}
-                            onPress={onCreateRemote}
-                            disabled={!supabaseConfigured}
-                        >
-                            <Text
+                        {remoteClientMode === "create" ? (
+                            <Pressable
                                 style={[
-                                    styles.resetText,
-                                    { fontSize: buttonFontSize },
+                                    styles.menuButtonSecondary,
+                                    {
+                                        marginTop: lineSpacing,
+                                        paddingVertical: resetButtonVerticalPadding,
+                                        paddingHorizontal:
+                                            resetButtonHorizontalPadding,
+                                        borderRadius: clamp(
+                                            Math.floor(panelRadius * 0.7),
+                                            5,
+                                            10,
+                                        ),
+                                    },
                                 ]}
+                                onPress={onCreateRemote}
+                                disabled={!supabaseConfigured}
                             >
-                                {supabaseConfigured ? "Créer remote" : ""}
-                            </Text>
-                        </Pressable>
+                                <Text
+                                    style={[
+                                        styles.resetText,
+                                        { fontSize: buttonFontSize },
+                                    ]}
+                                >
+                                    {supabaseConfigured ? "Créer partie" : ""}
+                                </Text>
+                            </Pressable>
+                        ) : (
+                            <Pressable
+                                style={[
+                                    styles.menuButtonSecondary,
+                                    {
+                                        marginTop: lineSpacing,
+                                        paddingVertical: resetButtonVerticalPadding,
+                                        paddingHorizontal:
+                                            resetButtonHorizontalPadding,
+                                        borderRadius: clamp(
+                                            Math.floor(panelRadius * 0.7),
+                                            5,
+                                            10,
+                                        ),
+                                    },
+                                ]}
+                                onPress={onJoinRemote}
+                                disabled={!supabaseConfigured}
+                            >
+                                <Text
+                                    style={[
+                                        styles.resetText,
+                                        { fontSize: buttonFontSize },
+                                    ]}
+                                >
+                                    {supabaseConfigured ? "S'inscrire" : ""}
+                                </Text>
+                            </Pressable>
+                        )}
 
                         <Pressable
                             style={[
@@ -1011,6 +1345,49 @@ const styles = StyleSheet.create({
         color: "#e5e7eb",
         textAlign: "center",
         fontWeight: "600",
+    },
+    joinColorButton: {
+        minWidth: 74,
+        backgroundColor: "#1f2937",
+        borderWidth: 1,
+        borderColor: "rgba(148, 163, 184, 0.4)",
+        borderRadius: 6,
+        paddingVertical: 8,
+        paddingHorizontal: 10,
+    },
+    joinColorButtonDisabled: {
+        opacity: 0.45,
+    },
+    joinableGamesContainer: {
+        backgroundColor: "rgba(15, 23, 42, 0.4)",
+        borderWidth: 1,
+        borderColor: "rgba(148, 163, 184, 0.2)",
+        borderRadius: 8,
+        padding: 8,
+    },
+    joinableGameButton: {
+        backgroundColor: "#1f2937",
+        borderWidth: 1,
+        borderColor: "rgba(148, 163, 184, 0.35)",
+        borderRadius: 6,
+        paddingHorizontal: 8,
+        paddingVertical: 8,
+    },
+    joinableGameTitle: {
+        color: "#f8fafc",
+        fontWeight: "700",
+        fontSize: 12,
+    },
+    joinableGameSub: {
+        color: "#cbd5e1",
+        marginTop: 4,
+        fontSize: 11,
+    },
+    refreshJoinablesButton: {
+        backgroundColor: "#374151",
+        borderRadius: 6,
+        paddingVertical: 8,
+        paddingHorizontal: 10,
     },
     playerInputRow: {
         flexDirection: "row",

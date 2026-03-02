@@ -36,9 +36,10 @@ EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
 - La clé `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` est publique par design et peut être exposée côté client.
 - Ne mettez jamais la clé `service_role` dans le frontend.
 - Les accès DB sont protégés par RLS dans `supabase/schema.sql`:
-  - lecture autorisée si partie publique, propriétaire, ou joueur assigné
+  - toutes les parties sont publiques en lecture pour les clients authentifiés
   - insertion autorisée au propriétaire authentifié
   - mise à jour autorisée au propriétaire et aux joueurs assignés
+  - inscription à une partie existante via la fonction RPC `join_chess_game`
 
 ## Fonctionnalités incluses
 
@@ -47,5 +48,5 @@ EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
 - Historique des coups
 - Reset de partie locale
 - Création et synchronisation d'une partie distante dans Supabase (`chess_games`)
-- Création multijoueur: visibilité `publique/privée` + sélection des joueurs (UUID Supabase par couleur)
+- Mode client: créer une partie (avec options joueurs/robots) ou s'inscrire à une partie existante non pleine
 - Sélection `Humain/Robot` par couleur avec coups automatiques des robots

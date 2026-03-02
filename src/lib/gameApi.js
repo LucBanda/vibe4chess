@@ -1,7 +1,7 @@
 import { supabase, supabaseConfigured } from "./supabase.js";
 
 const LOG_PREFIX = "[supabase][gameApi]";
-const VISIBILITIES = new Set(["public", "private"]);
+const PLAYER_COLORS = ["white", "red", "black", "blue"];
 
 function asPayload(gameState) {
     if (typeof gameState?.fen === "function") {
@@ -109,26 +109,31 @@ async function ensureAuthenticatedUserId() {
 }
 
 export function normalizeCreateOptions(ownerId, options = {}) {
-    const requestedVisibility = options?.visibility ?? "private";
-    const visibility = VISIBILITIES.has(requestedVisibility)
-        ? requestedVisibility
-        : "private";
     const rawPlayerIds = options?.playerIdsByColor ?? {};
+    const controlByColor = options?.controlByColor ?? {};
     const playerIds = {};
 
+    for (const color of PLAYER_COLORS) {
+        if (controlByColor[color] === "robot") {
+            playerIds[color] = "robot";
+        }
+    }
+
     for (const [color, candidate] of Object.entries(rawPlayerIds)) {
+        if (controlByColor[color] === "robot") {
+            continue;
+        }
         const trimmed = typeof candidate === "string" ? candidate.trim() : "";
         if (trimmed) {
             playerIds[color] = trimmed;
         }
     }
 
-    if (!playerIds.white) {
+    if (!playerIds.white || playerIds.white === "robot") {
         playerIds.white = ownerId;
     }
 
     return {
-        visibility,
         player_ids: playerIds,
     };
 }
@@ -145,7 +150,6 @@ export async function createRemoteGame(gameState, options = {}) {
     };
     console.log(`${LOG_PREFIX} createRemoteGame:insert`, {
         ownerId: userId,
-        visibility: payload.visibility,
         playerIds: payload.player_ids,
         turn: payload.turn,
         status: payload.status,
@@ -155,7 +159,7 @@ export async function createRemoteGame(gameState, options = {}) {
     const { data, error } = await supabase
         .from("chess_games")
         .insert(payload)
-        .select("id, visibility, player_ids")
+        .select("id, player_ids, updated_at")
         .single();
 
     if (error) {
@@ -175,14 +179,100 @@ export async function createRemoteGame(gameState, options = {}) {
 
 export async function syncRemoteGame(gameId, gameState) {
     await ensureAuthenticatedUserId();
-    const { error } = await supabase
+    const { data, error } = await supabase
         .from("chess_games")
         .update(asPayload(gameState))
-        .eq("id", gameId);
+        .eq("id", gameId)
+        .select("updated_at")
+        .single();
 
     if (error) {
         throw new Error(`Synchronisation impossible: ${error.message}`);
     }
+
+    return data;
+}
+
+export async function joinRemoteGame(gameId, preferredColor = null) {
+    const userId = await ensureAuthenticatedUserId();
+    const trimmedGameId = gameId?.trim();
+    if (!trimmedGameId) {
+        throw new Error("Game ID requis pour s'inscrire.");
+    }
+
+    const color = typeof preferredColor === "string" ? preferredColor.trim() : null;
+    const rpcPayload = {
+        p_game_id: trimmedGameId,
+        p_color: color || null,
+    };
+
+    console.log(`${LOG_PREFIX} joinRemoteGame:start`, {
+        gameId: trimmedGameId,
+        preferredColor: rpcPayload.p_color,
+        userId,
+    });
+
+    const { data, error } = await supabase.rpc("join_chess_game", rpcPayload);
+    if (error) {
+        console.error(`${LOG_PREFIX} joinRemoteGame:error`, {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint,
+        });
+        throw new Error(`Inscription impossible: ${error.message}`);
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row?.id) {
+        throw new Error("Inscription impossible: réponse Supabase invalide.");
+    }
+
+    console.log(`${LOG_PREFIX} joinRemoteGame:success`, {
+        gameId: row.id,
+        assignedColor: row.assigned_color ?? null,
+    });
+
+    return row;
+}
+
+export async function fetchRemoteGame(gameId) {
+    assertConfigured();
+    const trimmedGameId = gameId?.trim();
+    if (!trimmedGameId) {
+        throw new Error("Game ID requis pour charger une partie.");
+    }
+
+    const { data, error } = await supabase
+        .from("chess_games")
+        .select("id, fen, pgn, turn, status, player_ids, updated_at")
+        .eq("id", trimmedGameId)
+        .single();
+
+    if (error) {
+        throw new Error(`Chargement impossible: ${error.message}`);
+    }
+
+    return data;
+}
+
+export async function listJoinableGames() {
+    assertConfigured();
+    const { data, error } = await supabase
+        .from("chess_games")
+        .select("id, status, player_ids, created_at, updated_at")
+        .eq("status", "active")
+        .order("updated_at", { ascending: false })
+        .limit(50);
+
+    if (error) {
+        throw new Error(`Liste des parties impossible: ${error.message}`);
+    }
+
+    return (data ?? []).filter((row) => {
+        const playerIds = row.player_ids ?? {};
+        return PLAYER_COLORS.some((color) => !playerIds[color]);
+    });
 }
 
 export { supabaseConfigured };
