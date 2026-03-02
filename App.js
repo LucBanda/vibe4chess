@@ -16,10 +16,16 @@ import {
     PLAYER_LABEL,
     PIECE_SYMBOL,
 } from "./src/game/constants.js";
-import { createInitialBoard, isPlayable, keyOf } from "./src/game/board.js";
+import { createInitialBoard, keyOf } from "./src/game/board.js";
 import { chooseRobotMove } from "./src/game/bot.js";
 import { applyMove, createCapturesBy } from "./src/game/engine.js";
 import { computeStats } from "./src/game/stats.js";
+import {
+    createPerspectiveCells,
+    firstHumanColor,
+    freeSeatsOf,
+    parseRemoteState,
+} from "./src/game/view.js";
 import {
     createRemoteGame,
     deleteRemoteGame,
@@ -33,75 +39,6 @@ import {
 
 function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
-}
-
-function parseRemoteState(row) {
-    let board = {};
-    let moveCount = 0;
-    let capturesBy = createCapturesBy();
-    let winner = null;
-
-    try {
-        const fenPayload = JSON.parse(row.fen);
-        if (fenPayload?.board && typeof fenPayload.board === "object") {
-            board = fenPayload.board;
-        }
-    } catch {
-        board = {};
-    }
-
-    try {
-        const pgnPayload = JSON.parse(row.pgn);
-        moveCount = Number.isFinite(pgnPayload?.moveCount)
-            ? pgnPayload.moveCount
-            : 0;
-        capturesBy = {
-            ...createCapturesBy(),
-            ...(pgnPayload?.capturesBy ?? {}),
-        };
-        winner = pgnPayload?.winner ?? null;
-    } catch {
-        moveCount = 0;
-        capturesBy = createCapturesBy();
-        winner = null;
-    }
-
-    return {
-        board,
-        turn: row.turn,
-        moveCount,
-        capturesBy,
-        winner,
-    };
-}
-
-function freeSeatsOf(playerIds) {
-    return PLAYERS.filter((color) => !playerIds?.[color]);
-}
-
-function firstHumanColor(controlByColor) {
-    for (const color of PLAYERS) {
-        if (controlByColor[color] === "human") {
-            return color;
-        }
-    }
-    return "white";
-}
-
-function displayToBoard(x, y, perspectiveColor) {
-    if (perspectiveColor === "red") {
-        return { x: BOARD_SIZE - 1 - y, y: x };
-    }
-    if (perspectiveColor === "black") {
-        return {
-            x: BOARD_SIZE - 1 - x,
-            y: BOARD_SIZE - 1 - y,
-        };
-    }
-    if (perspectiveColor === "blue") {
-        return { x: y, y: BOARD_SIZE - 1 - x };
-    }
-    return { x, y };
 }
 
 export default function App() {
@@ -170,26 +107,10 @@ export default function App() {
     const lineSpacing = clamp(Math.floor(shortSide * 0.006), 3, 8);
     const stageGap = clamp(Math.floor(shortSide * 0.012), 6, 14);
 
-    const cells = useMemo(() => {
-        const nextCells = [];
-
-        for (let y = 0; y < BOARD_SIZE; y += 1) {
-            for (let x = 0; x < BOARD_SIZE; x += 1) {
-                const boardPos = displayToBoard(x, y, localPlayerColor);
-                nextCells.push({
-                    x,
-                    y,
-                    boardX: boardPos.x,
-                    boardY: boardPos.y,
-                    playable: isPlayable(boardPos.x, boardPos.y),
-                    piece: board[keyOf(boardPos.x, boardPos.y)] ?? null,
-                    isLight: (boardPos.x + boardPos.y) % 2 === 0,
-                });
-            }
-        }
-
-        return nextCells;
-    }, [board, localPlayerColor]);
+    const cells = useMemo(
+        () => createPerspectiveCells(board, localPlayerColor),
+        [board, localPlayerColor],
+    );
     const stats = useMemo(
         () => computeStats(board, capturesBy),
         [board, capturesBy],
