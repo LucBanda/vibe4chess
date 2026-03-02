@@ -80,6 +80,7 @@ function freeSeatsOf(playerIds) {
 
 export default function App() {
     const { width, height } = useWindowDimensions();
+    const [sidebarMeasuredWidth, setSidebarMeasuredWidth] = useState(0);
     const [board, setBoard] = useState(() => createInitialBoard());
     const [turn, setTurn] = useState("white");
     const [selected, setSelected] = useState(null);
@@ -105,19 +106,19 @@ export default function App() {
     });
 
     const shortSide = Math.min(width, height);
-    const sidebarWidth = clamp(Math.floor(width * 0.2), 120, 240);
-    const stageWidth = Math.max(width - sidebarWidth, 220);
-    const boardPixelSize = Math.floor(Math.min(width, height) - 12);
+    const stageWidth = Math.max(width - sidebarMeasuredWidth, 220);
+    const scorePanelWidth = clamp(Math.floor(stageWidth * 0.18), 108, 180);
+    const boardPixelSize = Math.floor(Math.min(stageWidth - 20, height - 20));
     const renderedBoardSize = Math.floor(
         clamp(
-            Math.min(stageWidth * 0.84, height * 0.76, boardPixelSize),
+            boardPixelSize,
             196,
             900,
         ),
     );
     const squareSize = Math.floor(renderedBoardSize / BOARD_SIZE);
     const boardSize = squareSize * BOARD_SIZE;
-    const menuShortSide = Math.min(sidebarWidth, height);
+    const menuShortSide = Math.min(Math.max(sidebarMeasuredWidth, 180), height);
 
     const panelHorizontalPadding = clamp(Math.floor(shortSide * 0.018), 10, 18);
     const panelVerticalPadding = clamp(Math.floor(shortSide * 0.016), 8, 16);
@@ -514,10 +515,16 @@ export default function App() {
             <StatusBar style="light" />
             <View style={styles.layoutRoot}>
                 <View
+                    onLayout={(event) => {
+                        const nextWidth = Math.floor(event.nativeEvent.layout.width);
+                        if (nextWidth > 0 && nextWidth !== sidebarMeasuredWidth) {
+                            setSidebarMeasuredWidth(nextWidth);
+                        }
+                    }}
                     style={[
                         styles.sidebar,
                         {
-                            width: sidebarWidth,
+                            maxWidth: Math.floor(width * 0.45),
                             padding: panelVerticalPadding,
                             gap: stageGap,
                         },
@@ -948,128 +955,12 @@ export default function App() {
                 </View>
 
                 <View
-                    style={[styles.stage, { padding: stageGap, gap: stageGap }]}
+                    style={[
+                        styles.stage,
+                        { paddingHorizontal: stageGap, paddingVertical: 0 },
+                    ]}
                 >
-                    <View style={[styles.stageRow, { gap: stageGap }]}>
-                        <View
-                            style={[
-                                styles.cornerPanel,
-                                {
-                                    borderRadius: panelRadius,
-                                    paddingHorizontal: panelHorizontalPadding,
-                                    paddingVertical: panelVerticalPadding,
-                                },
-                            ]}
-                        >
-                            <View style={styles.cornerTextStack}>
-                                <Text
-                                    style={[
-                                        styles.cornerTitle,
-                                        { fontSize: titleFontSize },
-                                    ]}
-                                >
-                                    Noir
-                                </Text>
-                                <View style={styles.cornerRow}>
-                                    <Text
-                                        style={[
-                                            styles.cornerSub,
-                                            { fontSize: subFontSize },
-                                        ]}
-                                    >
-                                        Pièces
-                                    </Text>
-                                    <Text
-                                        style={[
-                                            styles.cornerSub,
-                                            { fontSize: subFontSize },
-                                        ]}
-                                    >
-                                        {blackStats?.pieces ?? 0}
-                                    </Text>
-                                </View>
-                                <View style={styles.cornerRow}>
-                                    <Text
-                                        style={[
-                                            styles.cornerSub,
-                                            { fontSize: subFontSize },
-                                        ]}
-                                    >
-                                        Prises
-                                    </Text>
-                                    <Text
-                                        style={[
-                                            styles.cornerSub,
-                                            { fontSize: subFontSize },
-                                        ]}
-                                    >
-                                        {blackStats?.captures ?? 0}
-                                    </Text>
-                                </View>
-                            </View>
-                        </View>
-                        <View style={{ width: boardSize }} />
-                        <View
-                            style={[
-                                styles.cornerPanel,
-                                {
-                                    borderRadius: panelRadius,
-                                    paddingHorizontal: panelHorizontalPadding,
-                                    paddingVertical: panelVerticalPadding,
-                                },
-                            ]}
-                        >
-                            <View style={styles.cornerTextStack}>
-                                <Text
-                                    style={[
-                                        styles.cornerTitle,
-                                        { fontSize: titleFontSize },
-                                    ]}
-                                >
-                                    Blanc
-                                </Text>
-                                <View style={styles.cornerRow}>
-                                    <Text
-                                        style={[
-                                            styles.cornerSub,
-                                            { fontSize: subFontSize },
-                                        ]}
-                                    >
-                                        Pièces
-                                    </Text>
-                                    <Text
-                                        style={[
-                                            styles.cornerSub,
-                                            { fontSize: subFontSize },
-                                        ]}
-                                    >
-                                        {whiteStats?.pieces ?? 0}
-                                    </Text>
-                                </View>
-                                <View style={styles.cornerRow}>
-                                    <Text
-                                        style={[
-                                            styles.cornerSub,
-                                            { fontSize: subFontSize },
-                                        ]}
-                                    >
-                                        Prises
-                                    </Text>
-                                    <Text
-                                        style={[
-                                            styles.cornerSub,
-                                            { fontSize: subFontSize },
-                                        ]}
-                                    >
-                                        {whiteStats?.captures ?? 0}
-                                    </Text>
-                                </View>
-                            </View>
-                        </View>
-                    </View>
-
-                    <View style={[styles.stageMiddleRow, { gap: stageGap }]}>
-                        <View style={styles.sideSpacer} />
+                    <View style={styles.boardLayer}>
                         <View
                             style={[
                                 styles.board,
@@ -1132,17 +1023,52 @@ export default function App() {
                                 );
                             })}
                         </View>
-                        <View style={styles.sideSpacer} />
                     </View>
 
-                    <View style={[styles.stageRow, { gap: stageGap }]}>
+                    {[
+                        {
+                            key: "black",
+                            label: "Noir",
+                            stats: blackStats,
+                            top: stageGap,
+                            left: stageGap,
+                        },
+                        {
+                            key: "white",
+                            label: "Blanc",
+                            stats: whiteStats,
+                            top: stageGap,
+                            right: stageGap,
+                        },
+                        {
+                            key: "red",
+                            label: "Rouge",
+                            stats: redStats,
+                            bottom: stageGap,
+                            left: stageGap,
+                        },
+                        {
+                            key: "blue",
+                            label: "Bleu",
+                            stats: blueStats,
+                            bottom: stageGap,
+                            right: stageGap,
+                        },
+                    ].map((panel) => (
                         <View
+                            key={panel.key}
                             style={[
                                 styles.cornerPanel,
+                                styles.cornerOverlayPanel,
                                 {
+                                    width: scorePanelWidth,
                                     borderRadius: panelRadius,
                                     paddingHorizontal: panelHorizontalPadding,
                                     paddingVertical: panelVerticalPadding,
+                                    top: panel.top,
+                                    right: panel.right,
+                                    bottom: panel.bottom,
+                                    left: panel.left,
                                 },
                             ]}
                         >
@@ -1153,7 +1079,7 @@ export default function App() {
                                         { fontSize: titleFontSize },
                                     ]}
                                 >
-                                    Rouge
+                                    {panel.label}
                                 </Text>
                                 <View style={styles.cornerRow}>
                                     <Text
@@ -1170,7 +1096,7 @@ export default function App() {
                                             { fontSize: subFontSize },
                                         ]}
                                     >
-                                        {redStats?.pieces ?? 0}
+                                        {panel.stats?.pieces ?? 0}
                                     </Text>
                                 </View>
                                 <View style={styles.cornerRow}>
@@ -1188,70 +1114,12 @@ export default function App() {
                                             { fontSize: subFontSize },
                                         ]}
                                     >
-                                        {redStats?.captures ?? 0}
+                                        {panel.stats?.captures ?? 0}
                                     </Text>
                                 </View>
                             </View>
                         </View>
-                        <View style={{ width: boardSize }} />
-                        <View
-                            style={[
-                                styles.cornerPanel,
-                                {
-                                    borderRadius: panelRadius,
-                                    paddingHorizontal: panelHorizontalPadding,
-                                    paddingVertical: panelVerticalPadding,
-                                },
-                            ]}
-                        >
-                            <View style={styles.cornerTextStack}>
-                                <Text
-                                    style={[
-                                        styles.cornerTitle,
-                                        { fontSize: titleFontSize },
-                                    ]}
-                                >
-                                    Bleu
-                                </Text>
-                                <View style={styles.cornerRow}>
-                                    <Text
-                                        style={[
-                                            styles.cornerSub,
-                                            { fontSize: subFontSize },
-                                        ]}
-                                    >
-                                        Pièces
-                                    </Text>
-                                    <Text
-                                        style={[
-                                            styles.cornerSub,
-                                            { fontSize: subFontSize },
-                                        ]}
-                                    >
-                                        {blueStats?.pieces ?? 0}
-                                    </Text>
-                                </View>
-                                <View style={styles.cornerRow}>
-                                    <Text
-                                        style={[
-                                            styles.cornerSub,
-                                            { fontSize: subFontSize },
-                                        ]}
-                                    >
-                                        Prises
-                                    </Text>
-                                    <Text
-                                        style={[
-                                            styles.cornerSub,
-                                            { fontSize: subFontSize },
-                                        ]}
-                                    >
-                                        {blueStats?.captures ?? 0}
-                                    </Text>
-                                </View>
-                            </View>
-                        </View>
-                    </View>
+                    ))}
                 </View>
             </View>
         </SafeAreaView>
@@ -1271,6 +1139,8 @@ const styles = StyleSheet.create({
         backgroundColor: "#0b1325",
         borderRightWidth: 1,
         borderRightColor: "rgba(255, 255, 255, 0.12)",
+        flexShrink: 0,
+        alignSelf: "stretch",
     },
     menuPanel: {
         backgroundColor: "rgba(17, 24, 39, 0.92)",
@@ -1279,18 +1149,12 @@ const styles = StyleSheet.create({
     },
     stage: {
         flex: 1,
+        position: "relative",
     },
-    stageRow: {
+    boardLayer: {
         flex: 1,
-        flexDirection: "row",
-    },
-    stageMiddleRow: {
-        flexDirection: "row",
         alignItems: "center",
         justifyContent: "center",
-    },
-    sideSpacer: {
-        flex: 1,
     },
     cornerPanel: {
         flex: 1,
@@ -1298,6 +1162,11 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: "rgba(255, 255, 255, 0.15)",
         justifyContent: "center",
+    },
+    cornerOverlayPanel: {
+        position: "absolute",
+        flex: 0,
+        zIndex: 2,
     },
     board: {
         flexDirection: "row",
