@@ -1375,14 +1375,16 @@ export default function App() {
                             },
                         ]}
                     >
-                        <Text
-                            style={[
-                                styles.cornerTitle,
-                                { fontSize: titleFontSize },
-                            ]}
-                        >
-                            Menu
-                        </Text>
+                        {!isInGame ? (
+                            <Text
+                                style={[
+                                    styles.cornerTitle,
+                                    { fontSize: titleFontSize },
+                                ]}
+                            >
+                                Menu
+                            </Text>
+                        ) : null}
                         {!isInGame ? (
                             <>
                                 <Text
@@ -1834,7 +1836,7 @@ export default function App() {
                                 </View>
                             </>
                         )}
-                        {!supabaseConfigured ? (
+                        {!supabaseConfigured && !isInGame ? (
                             <Text
                                 style={[
                                     styles.cornerSub,
