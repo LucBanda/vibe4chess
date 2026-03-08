@@ -32,7 +32,6 @@ import {
 import {
     clearPlayerStatus,
     createRemoteGame,
-    deleteRemoteGame,
     fetchPlayerStatus,
     fetchRemoteGame,
     getAuthenticatedUserId,
@@ -83,6 +82,7 @@ export default function App() {
     const [selectedJoinGameId, setSelectedJoinGameId] = useState(null);
     const [loadingJoinableGames, setLoadingJoinableGames] = useState(false);
     const [hasSavedLocalGame, setHasSavedLocalGame] = useState(false);
+    const [pendingRemoteResume, setPendingRemoteResume] = useState(null);
     const [remoteUpdatedAt, setRemoteUpdatedAt] = useState(null);
     const remoteUpdatedAtRef = useRef(null);
     const hasAutoResumedLocalRef = useRef(false);
@@ -210,6 +210,7 @@ export default function App() {
     const winner = alivePlayers.length === 1 ? alivePlayers[0] : null;
     const playerColorLabel = PLAYER_LABEL[localPlayerColor] ?? "Inconnue";
     const canResumeLocalGame = hasSavedLocalGame && !isInGame;
+    const canResumeRemoteGame = Boolean(pendingRemoteResume) && !isInGame;
 
     useEffect(() => {
         remoteUpdatedAtRef.current = remoteUpdatedAt;
@@ -616,6 +617,39 @@ export default function App() {
         hasAutoResumedLocalRef.current = true;
     };
 
+    const resumePendingRemoteGame = async () => {
+        if (!pendingRemoteResume?.gameId) {
+            Alert.alert("Reprise", "Aucune partie distante à reprendre.");
+            return;
+        }
+
+        try {
+            const remoteGame = await fetchRemoteGame(pendingRemoteResume.gameId);
+            const parsed = parseRemoteState(remoteGame);
+            applyGameState(parsed);
+            setPlayMode(pendingRemoteResume.sessionMode === "remote_create" ? "create" : "join");
+            setRemoteGameId(pendingRemoteResume.gameId);
+            setRemotePlayerIds(remoteGame.player_ids ?? pendingRemoteResume.playerIds ?? {});
+            setRemoteUpdatedAt(remoteGame.updated_at ?? null);
+            setIsRemoteOwner(Boolean(pendingRemoteResume.isOwner));
+            setLocalPlayerColor(
+                pendingRemoteResume.currentColor ??
+                    colorOfPlayer(remoteGame.player_ids, normalizedPlayerUsername) ??
+                    "white",
+            );
+            setJoinColor(pendingRemoteResume.currentColor ?? joinColor);
+            setIsInGame(true);
+            setSyncMessage("Partie distante reprise");
+        } catch (error) {
+            if (isRemoteGameNotFoundError(error)) {
+                setPendingRemoteResume(null);
+                Alert.alert("Reprise", "La partie distante n'existe plus.");
+                return;
+            }
+            Alert.alert("Reprise", error.message);
+        }
+    };
+
     const syncLocalStateToRemote = async (nextState, reason = "sync") => {
         if (!isInGame || playMode === "local" || !remoteGameId) {
             return;
@@ -684,6 +718,13 @@ export default function App() {
             setSyncMessage(
                 `Remote: partie créée (${result.id.slice(0, 8)}...)`,
             );
+            setPendingRemoteResume({
+                gameId: result.id,
+                sessionMode: "remote_create",
+                currentColor: localColor,
+                isOwner: true,
+                playerIds: result.player_ids ?? {},
+            });
             void persistPlayerPresence({
                 username,
                 status: "in_game",
@@ -745,6 +786,13 @@ export default function App() {
             setSyncMessage(
                 `Remote: inscrit en ${PLAYER_LABEL[assignedColor]} (${result.id.slice(0, 8)}...)`,
             );
+            setPendingRemoteResume({
+                gameId: result.id,
+                sessionMode: "remote_join",
+                currentColor: assignedColor,
+                isOwner: false,
+                playerIds: remoteGame.player_ids ?? {},
+            });
             void persistPlayerPresence({
                 username,
                 status: "in_game",
@@ -775,17 +823,17 @@ export default function App() {
     };
 
     const onQuitGame = async () => {
-        if (remoteGameId && isRemoteOwner) {
-            try {
-                await deleteRemoteGame(remoteGameId);
-            } catch (error) {
-                Alert.alert("Supabase", error.message);
-                return;
-            }
-        }
-
         if (playMode === "local") {
             skipAutoResumeAfterQuitRef.current = true;
+        }
+        if (playMode !== "local" && remoteGameId) {
+            setPendingRemoteResume({
+                gameId: remoteGameId,
+                sessionMode: playMode === "create" ? "remote_create" : "remote_join",
+                currentColor: localPlayerColor,
+                isOwner: isRemoteOwner,
+                playerIds: remotePlayerIds,
+            });
         }
 
         resetToNoGame();
@@ -1016,27 +1064,18 @@ export default function App() {
                 if (!gameId) {
                     return;
                 }
-
-                const remoteGame = await fetchRemoteGame(gameId);
-                if (cancelled) {
-                    return;
-                }
-                const parsed = parseRemoteState(remoteGame);
                 const resolvedColor =
                     colorFromStatus ??
-                    colorOfPlayer(remoteGame.player_ids, requestedUsername) ??
                     "white";
-
-                applyGameState(parsed);
+                setPendingRemoteResume({
+                    gameId,
+                    sessionMode,
+                    currentColor: resolvedColor,
+                    isOwner: Boolean(statusRow.is_owner),
+                    playerIds: statusRow.player_ids ?? {},
+                });
                 setPlayMode(sessionMode === "remote_create" ? "create" : "join");
-                setRemoteGameId(gameId);
-                setRemotePlayerIds(remoteGame.player_ids ?? {});
-                setRemoteUpdatedAt(remoteGame.updated_at ?? null);
-                setIsRemoteOwner(Boolean(statusRow.is_owner));
-                setLocalPlayerColor(resolvedColor);
-                setJoinColor(resolvedColor);
-                setIsInGame(true);
-                setSyncMessage(`Partie remote restaurée (${requestedUsername})`);
+                setSyncMessage(`Partie distante prête à reprendre (${requestedUsername})`);
             } catch (error) {
                 if (!cancelled) {
                     console.error("Player status restore failed", error);
@@ -1693,6 +1732,37 @@ export default function App() {
                                         {isSmallScreen
                                             ? "↺ Reprendre locale"
                                             : "Reprendre partie locale"}
+                                    </Text>
+                                </Pressable>
+
+                                <Pressable
+                                    style={[
+                                        styles.menuButtonSecondary,
+                                        {
+                                            marginTop: lineSpacing * 2,
+                                            paddingVertical: resetButtonVerticalPadding,
+                                            paddingHorizontal:
+                                                resetButtonHorizontalPadding,
+                                            borderRadius: clamp(
+                                                Math.floor(panelRadius * 0.7),
+                                                5,
+                                                10,
+                                            ),
+                                            opacity: canResumeRemoteGame ? 1 : 0.45,
+                                        },
+                                    ]}
+                                    onPress={resumePendingRemoteGame}
+                                    disabled={!canResumeRemoteGame}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.resetText,
+                                            { fontSize: buttonFontSize },
+                                        ]}
+                                    >
+                                        {isSmallScreen
+                                            ? "↺ Reprendre remote"
+                                            : "Reprendre partie distante"}
                                     </Text>
                                 </Pressable>
 
