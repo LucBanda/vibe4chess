@@ -1,0 +1,12 @@
+## Handoff
+- Scope: Revue de risques du diff `App.js` sur gestures mobile et gestion pseudo joueur.
+- Changements: Analyse des points sensibles (capture gestures, conflits taps/selection, source unique double-tap, pseudo vide).
+- Risques:
+  - Corrigé: double gestion du double-tap (source unique dans `selectOrMove`).
+  - Corrigé: capture pan évite d'intercepter les taps simples (capture sur move/pinch uniquement).
+  - Surveiller: UX mobile réelle (seuils de gesture) selon appareils.
+- Verification locale:
+  - Revue statique du diff avec références de lignes.
+  - Tests verts: `npm run test:unit`, `npm run test:web-build`.
+- Actions suivantes:
+  - Ajuster les seuils (`dx/dy` et fenêtre double-tap) si retours terrain.
