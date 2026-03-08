@@ -431,6 +431,24 @@ export default function App() {
         if (!isInGame) {
             return;
         }
+        if (playMode !== "local" && moveCount === 0) {
+            const missingSeats = PLAYERS.filter((color) => !remotePlayerIds[color]);
+            if (missingSeats.length > 0) {
+                const nextPlayerIds = { ...remotePlayerIds };
+                for (const color of missingSeats) {
+                    nextPlayerIds[color] = "robot";
+                }
+                setRemotePlayerIds(nextPlayerIds);
+                setControlByColor((previous) => {
+                    const next = { ...previous };
+                    for (const color of missingSeats) {
+                        next[color] = "robot";
+                    }
+                    return next;
+                });
+                setWaitingPlayersMessage(null);
+            }
+        }
         const zoomedOrPanned =
             boardZoomRef.current > 1 ||
             Math.abs(boardPanRef.current.x) > 2 ||
