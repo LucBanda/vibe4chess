@@ -872,6 +872,10 @@ export default function App() {
         return PLAYER_COLOR[panelKey] ?? "#60a5fa";
     };
     const isPanelActiveTurn = (panelKey) => !winner && turn === panelKey;
+    const getPanelStatusBackground = (panelKey) =>
+        isPanelActiveTurn(panelKey) ? "#ffffff" : "#0b1220";
+    const getPanelStatusTextColor = (panelKey) =>
+        isPanelActiveTurn(panelKey) ? "#0b1220" : "#ffffff";
 
     useEffect(() => {
         setTabUsername(playerUsername);
@@ -1929,17 +1933,23 @@ export default function App() {
                                                 <View
                                                     style={[
                                                         styles.playerStatusBadge,
+                                                        isPanelActiveTurn(panel.key)
+                                                            ? styles.playerStatusBadgeActive
+                                                            : null,
                                                         {
                                                             borderColor: getPanelStatusTone(panel.key),
-                                                            backgroundColor: "rgba(15, 23, 42, 0.82)",
+                                                            backgroundColor: getPanelStatusBackground(panel.key),
                                                             borderWidth: isPanelActiveTurn(panel.key) ? 3 : 2,
                                                         },
                                                     ]}
                                                 >
                                                     <Text
                                                         style={[
-                                                            styles.cornerSub,
-                                                            { fontSize: subFontSize },
+                                                            styles.playerStatusText,
+                                                            {
+                                                                fontSize: subFontSize,
+                                                                color: getPanelStatusTextColor(panel.key),
+                                                            },
                                                         ]}
                                                     >
                                                         {getPanelStatusLabel(panel.key)}
@@ -2019,17 +2029,23 @@ export default function App() {
                                                 <View
                                                     style={[
                                                         styles.playerStatusBadge,
+                                                        isPanelActiveTurn(panel.key)
+                                                            ? styles.playerStatusBadgeActive
+                                                            : null,
                                                         {
                                                             borderColor: getPanelStatusTone(panel.key),
-                                                            backgroundColor: "rgba(15, 23, 42, 0.82)",
+                                                            backgroundColor: getPanelStatusBackground(panel.key),
                                                             borderWidth: isPanelActiveTurn(panel.key) ? 3 : 2,
                                                         },
                                                     ]}
                                                 >
                                                     <Text
                                                         style={[
-                                                            styles.cornerSub,
-                                                            { fontSize: subFontSize },
+                                                            styles.playerStatusText,
+                                                            {
+                                                                fontSize: subFontSize,
+                                                                color: getPanelStatusTextColor(panel.key),
+                                                            },
                                                         ]}
                                                     >
                                                         {getPanelStatusLabel(panel.key)}
@@ -2244,6 +2260,19 @@ const styles = StyleSheet.create({
         borderRadius: 999,
         paddingHorizontal: 8,
         paddingVertical: 2,
+    },
+    playerStatusText: {
+        fontWeight: "700",
+    },
+    playerStatusBadgeActive: {
+        shadowColor: "#000",
+        shadowOpacity: 0.32,
+        shadowRadius: 6,
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        elevation: 3,
     },
     resetButton: {
         backgroundColor: "#1d4ed8",
