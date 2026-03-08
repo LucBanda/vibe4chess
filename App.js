@@ -871,6 +871,7 @@ export default function App() {
         }
         return PLAYER_COLOR[panelKey] ?? "#60a5fa";
     };
+    const isPanelActiveTurn = (panelKey) => !winner && turn === panelKey;
 
     useEffect(() => {
         setTabUsername(playerUsername);
@@ -1387,83 +1388,6 @@ export default function App() {
                         ) : null}
                         {!isInGame ? (
                             <>
-                                <Text
-                                    style={[
-                                        styles.cornerValue,
-                                        {
-                                            fontSize: valueFontSize,
-                                            marginTop: lineSpacing,
-                                        },
-                                    ]}
-                                >
-                                    {winner
-                                        ? `Gagnant: ${PLAYER_LABEL[winner]}`
-                                        : PLAYER_LABEL[turn]}
-                                </Text>
-                                {useCompactInGameMenu ? (
-                                    <Text
-                                        style={[
-                                            styles.cornerSub,
-                                            {
-                                                fontSize: subFontSize,
-                                                marginTop: lineSpacing,
-                                            },
-                                        ]}
-                                    >
-                                        {displayPlayerUsername} | {playerColorLabel} | {moveCount} coups
-                                    </Text>
-                                ) : (
-                                    <>
-                                        <Text
-                                            style={[
-                                                styles.cornerSub,
-                                                {
-                                                    fontSize: subFontSize,
-                                                    marginTop: lineSpacing,
-                                                },
-                                            ]}
-                                        >
-                                            Joueur: {displayPlayerUsername}
-                                        </Text>
-                                        <Text
-                                            style={[
-                                                styles.cornerSub,
-                                                {
-                                                    fontSize: subFontSize,
-                                                    marginTop: lineSpacing,
-                                                },
-                                            ]}
-                                        >
-                                            Ma couleur: {playerColorLabel}
-                                        </Text>
-                                        <Text
-                                            style={[
-                                                styles.cornerSub,
-                                                {
-                                                    fontSize: subFontSize,
-                                                    marginTop: lineSpacing,
-                                                },
-                                            ]}
-                                        >
-                                            Coups: {moveCount}
-                                        </Text>
-                                    </>
-                                )}
-                            </>
-                        ) : null}
-                        {!isInGame ? (
-                            <>
-                                <Text
-                                    style={[
-                                        styles.cornerSub,
-                                        {
-                                            fontSize: subFontSize,
-                                            marginTop: lineSpacing * 2,
-                                        },
-                                    ]}
-                                >
-                                    Mode de jeu
-                                </Text>
                                 <Text
                                     style={[
                                         styles.cornerSub,
@@ -2008,6 +1932,7 @@ export default function App() {
                                                         {
                                                             borderColor: getPanelStatusTone(panel.key),
                                                             backgroundColor: "rgba(15, 23, 42, 0.82)",
+                                                            borderWidth: isPanelActiveTurn(panel.key) ? 3 : 2,
                                                         },
                                                     ]}
                                                 >
@@ -2097,6 +2022,7 @@ export default function App() {
                                                         {
                                                             borderColor: getPanelStatusTone(panel.key),
                                                             backgroundColor: "rgba(15, 23, 42, 0.82)",
+                                                            borderWidth: isPanelActiveTurn(panel.key) ? 3 : 2,
                                                         },
                                                     ]}
                                                 >
