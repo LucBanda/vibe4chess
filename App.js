@@ -82,6 +82,7 @@ export default function App() {
     const [isRemoteOwner, setIsRemoteOwner] = useState(false);
     const [localPlayerColor, setLocalPlayerColor] = useState("white");
     const [syncMessage, setSyncMessage] = useState("Remote: non synchronisé");
+    const [waitingPlayersMessage, setWaitingPlayersMessage] = useState(null);
     const [joinColor, setJoinColor] = useState("white");
     const [joinableGames, setJoinableGames] = useState([]);
     const [selectedJoinGameId, setSelectedJoinGameId] = useState(null);
@@ -328,6 +329,7 @@ export default function App() {
         setLocalPlayerColor("white");
         initializeGame();
         setSyncMessage("Aucune partie en cours");
+        setWaitingPlayersMessage(null);
         setSelected(null);
         setLastMove(null);
     };
@@ -346,6 +348,7 @@ export default function App() {
         const localColor = firstHumanColor(controlByColor);
         setLocalPlayerColor(localColor);
         setSyncMessage("Mode local");
+        setWaitingPlayersMessage(null);
         setIsInGame(true);
         void persistPlayerPresence({
             username,
@@ -384,6 +387,7 @@ export default function App() {
         setLocalPlayerColor(localSession.currentColor ?? firstHumanColor(snapshot.controlByColor));
         setIsInGame(true);
         setSyncMessage(`Partie locale reprise (${username})`);
+        setWaitingPlayersMessage(null);
         hasAutoResumedLocalRef.current = true;
     };
 
@@ -709,6 +713,7 @@ export default function App() {
                     setLocalPlayerColor(colorFromStatus ?? "white");
                     setIsInGame(true);
                     setSyncMessage(`Partie locale restaurée (${requestedUsername})`);
+                    setWaitingPlayersMessage(null);
                     return;
                 }
 
@@ -964,6 +969,86 @@ export default function App() {
             }
         };
     }, [isInGame, playMode, remoteGameId, supabaseConfigured]);
+
+    useEffect(() => {
+        if (!isInGame || playMode === "local" || !remoteGameId || !supabaseConfigured) {
+            setWaitingPlayersMessage(null);
+            return undefined;
+        }
+
+        let cancelled = false;
+        let intervalId = null;
+
+        const updateWaitingStatus = async () => {
+            const missingSeats = PLAYERS.filter((color) => !remotePlayerIds[color]);
+            if (missingSeats.length > 0) {
+                if (!cancelled) {
+                    setWaitingPlayersMessage(
+                        `En attente de joueurs: ${4 - missingSeats.length}/4 sièges occupés`,
+                    );
+                }
+                return;
+            }
+
+            const humanPlayers = Array.from(
+                new Set(
+                    Object.values(remotePlayerIds).filter(
+                        (username) => Boolean(username) && username !== "robot",
+                    ),
+                ),
+            );
+            if (humanPlayers.length === 0) {
+                if (!cancelled) {
+                    setWaitingPlayersMessage(null);
+                }
+                return;
+            }
+
+            const statuses = await Promise.all(
+                humanPlayers.map(async (username) => {
+                    try {
+                        return await fetchPlayerStatus(username);
+                    } catch (error) {
+                        return null;
+                    }
+                }),
+            );
+
+            if (cancelled) {
+                return;
+            }
+
+            const disconnectedPlayers = humanPlayers.filter((username, index) => {
+                const statusRow = statuses[index];
+                return (
+                    !statusRow ||
+                    statusRow.status !== "in_game" ||
+                    statusRow.current_game_id !== remoteGameId
+                );
+            });
+
+            if (disconnectedPlayers.length > 0) {
+                setWaitingPlayersMessage(
+                    `En attente de joueurs: ${disconnectedPlayers.join(", ")}`,
+                );
+                return;
+            }
+
+            setWaitingPlayersMessage(null);
+        };
+
+        void updateWaitingStatus();
+        intervalId = setInterval(() => {
+            void updateWaitingStatus();
+        }, 5000);
+
+        return () => {
+            cancelled = true;
+            if (intervalId) {
+                clearInterval(intervalId);
+            }
+        };
+    }, [isInGame, playMode, remoteGameId, supabaseConfigured, remotePlayerIds]);
 
     return (
         <SafeAreaView style={styles.page}>
@@ -1490,6 +1575,20 @@ export default function App() {
                         >
                             {syncMessage}
                         </Text>
+                        {waitingPlayersMessage ? (
+                            <Text
+                                style={[
+                                    styles.cornerSub,
+                                    {
+                                        fontSize: subFontSize,
+                                        marginTop: lineSpacing,
+                                        color: "#fbbf24",
+                                    },
+                                ]}
+                            >
+                                {waitingPlayersMessage}
+                            </Text>
+                        ) : null}
                         <Text
                             style={[
                                 styles.cornerSub,
