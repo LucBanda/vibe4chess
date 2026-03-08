@@ -626,27 +626,32 @@ export default function App() {
         try {
             const remoteGame = await fetchRemoteGame(pendingRemoteResume.gameId);
             const parsed = parseRemoteState(remoteGame);
+            const resumedColor =
+                pendingRemoteResume.currentColor ??
+                colorOfPlayer(remoteGame.player_ids, normalizedPlayerUsername) ??
+                "white";
             applyGameState(parsed);
             setPlayMode(pendingRemoteResume.sessionMode === "remote_create" ? "create" : "join");
             setRemoteGameId(pendingRemoteResume.gameId);
             setRemotePlayerIds(remoteGame.player_ids ?? pendingRemoteResume.playerIds ?? {});
             setRemoteUpdatedAt(remoteGame.updated_at ?? null);
             setIsRemoteOwner(Boolean(pendingRemoteResume.isOwner));
-            setLocalPlayerColor(
-                pendingRemoteResume.currentColor ??
-                    colorOfPlayer(remoteGame.player_ids, normalizedPlayerUsername) ??
-                    "white",
-            );
+            setLocalPlayerColor(resumedColor);
             setJoinColor(pendingRemoteResume.currentColor ?? joinColor);
             setIsInGame(true);
             setSyncMessage("Partie distante reprise");
             void persistRemoteResumeHint({
                 gameId: pendingRemoteResume.gameId,
                 sessionMode: pendingRemoteResume.sessionMode,
-                currentColor:
-                    pendingRemoteResume.currentColor ??
-                    colorOfPlayer(remoteGame.player_ids, normalizedPlayerUsername) ??
-                    "white",
+                currentColor: resumedColor,
+                isOwner: Boolean(pendingRemoteResume.isOwner),
+            });
+            void persistPlayerPresence({
+                username: normalizedPlayerUsername,
+                status: "in_game",
+                sessionMode: pendingRemoteResume.sessionMode,
+                currentGameId: pendingRemoteResume.gameId,
+                currentColor: resumedColor,
                 isOwner: Boolean(pendingRemoteResume.isOwner),
             });
         } catch (error) {
