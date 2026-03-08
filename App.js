@@ -113,7 +113,11 @@ export default function App() {
 
     const isCompactLayout = width < 980;
     const isSmallScreen = width < 700;
-    const effectiveSidebarWidth = isCompactLayout ? 0 : sidebarMeasuredWidth;
+    const effectiveSidebarWidth = isInGame
+        ? 0
+        : isCompactLayout
+          ? 0
+          : sidebarMeasuredWidth;
     const shortSide = Math.min(width, height);
     const stageWidth = Math.max(width - effectiveSidebarWidth, 220);
     const scorePanelWidth = clamp(Math.floor(stageWidth * 0.18), 108, 180);
@@ -1416,7 +1420,7 @@ export default function App() {
 
             if (disconnectedPlayers.length > 0) {
                 setWaitingPlayersMessage(
-                    `Partie en pause: reconnexion de ${disconnectedPlayers.join(", ")}`,
+                    `reconnexion de ${disconnectedPlayers.join(", ")}`,
                 );
                 return;
             }
@@ -1453,238 +1457,359 @@ export default function App() {
                     },
                 ]}
             >
-                <View
-                    onLayout={(event) => {
-                        const nextWidth = Math.floor(
-                            event.nativeEvent.layout.width,
-                        );
-                        if (
-                            nextWidth > 0 &&
-                            nextWidth !== sidebarMeasuredWidth
-                        ) {
-                            setSidebarMeasuredWidth(nextWidth);
-                        }
-                    }}
-                    style={[
-                        styles.sidebar,
-                        {
-                            width: !isInGame
-                                ? Math.min(width - stageGap * 2, 880)
-                                : undefined,
-                            maxWidth: isCompactLayout
-                                ? Math.min(width, isSmallScreen ? 420 : width)
-                                : isInGame
-                                  ? Math.floor(width * 0.26)
-                                  : Math.min(width - stageGap * 2, 880),
-                            padding: isSmallScreen
-                                ? Math.max(6, panelVerticalPadding - 3)
-                                : panelVerticalPadding,
-                            gap: stageGap,
-                            borderRightWidth: isCompactLayout ? 0 : 1,
-                            borderBottomWidth:
-                                isCompactLayout && isInGame ? 1 : 0,
-                            borderBottomColor: "rgba(255, 255, 255, 0.12)",
-                        },
-                    ]}
-                >
+                {!isInGame ? (
                     <View
+                        onLayout={(event) => {
+                            const nextWidth = Math.floor(
+                                event.nativeEvent.layout.width,
+                            );
+                            if (
+                                nextWidth > 0 &&
+                                nextWidth !== sidebarMeasuredWidth
+                            ) {
+                                setSidebarMeasuredWidth(nextWidth);
+                            }
+                        }}
                         style={[
-                            styles.menuPanel,
+                            styles.sidebar,
                             {
-                                borderRadius: panelRadius,
-                                paddingHorizontal: panelHorizontalPadding,
-                                paddingVertical: panelVerticalPadding,
-                                flex: !isInGame ? 1 : 0,
-                                justifyContent: "flex-start",
+                                width: Math.min(width - stageGap * 2, 880),
+                                maxWidth: isCompactLayout
+                                    ? Math.min(
+                                          width,
+                                          isSmallScreen ? 420 : width,
+                                      )
+                                    : Math.min(width - stageGap * 2, 880),
+                                padding: isSmallScreen
+                                    ? Math.max(6, panelVerticalPadding - 3)
+                                    : panelVerticalPadding,
+                                gap: stageGap,
+                                borderRightWidth: isCompactLayout ? 0 : 1,
+                                borderBottomWidth: 0,
+                                borderBottomColor: "rgba(255, 255, 255, 0.12)",
                             },
                         ]}
                     >
-                        {!isInGame ? (
-                            <View
-                                style={[
-                                    styles.menuFlow,
-                                    {
-                                        marginTop: lineSpacing * 2,
-                                        gap: lineSpacing * 2,
-                                    },
-                                ]}
-                            >
+                        <View
+                            style={[
+                                styles.menuPanel,
+                                {
+                                    borderRadius: panelRadius,
+                                    paddingHorizontal: panelHorizontalPadding,
+                                    paddingVertical: panelVerticalPadding,
+                                    flex: !isInGame ? 1 : 0,
+                                    justifyContent: "flex-start",
+                                },
+                            ]}
+                        >
+                            {!isInGame ? (
                                 <View
                                     style={[
-                                        styles.menuFormBlock,
+                                        styles.menuFlow,
                                         {
-                                            gap: lineSpacing,
+                                            marginTop: lineSpacing * 2,
+                                            gap: lineSpacing * 2,
                                         },
                                     ]}
                                 >
                                     <View
                                         style={[
-                                            styles.menuSection,
-                                            styles.menuTypeSection,
+                                            styles.menuFormBlock,
+                                            {
+                                                gap: lineSpacing,
+                                            },
                                         ]}
                                     >
-                                        <Text
-                                            style={[
-                                                styles.menuSectionLabel,
-                                                { fontSize: subFontSize },
-                                            ]}
-                                        >
-                                            Joueur
-                                        </Text>
-                                        <TextInput
-                                            style={[
-                                                styles.usernameInput,
-                                                {
-                                                    marginTop: Math.max(
-                                                        2,
-                                                        lineSpacing - 1,
-                                                    ),
-                                                },
-                                            ]}
-                                            value={playerUsername}
-                                            onChangeText={(text) => {
-                                                setPlayerUsername(text);
-                                            }}
-                                            autoCapitalize="none"
-                                            autoCorrect={false}
-                                            maxLength={32}
-                                            placeholder="ex: alice"
-                                            placeholderTextColor="#94a3b8"
-                                        />
-                                    </View>
-
-                                    <View style={styles.menuSection}>
-                                        <Text
-                                            style={[
-                                                styles.menuSectionLabel,
-                                                { fontSize: subFontSize },
-                                            ]}
-                                        >
-                                            Type de partie
-                                        </Text>
                                         <View
                                             style={[
-                                                styles.visibilityRow,
-                                                {
-                                                    marginTop: Math.max(
-                                                        2,
-                                                        lineSpacing - 1,
-                                                    ),
-                                                    gap: lineSpacing,
-                                                    flexWrap: isSmallScreen
-                                                        ? "wrap"
-                                                        : "nowrap",
-                                                },
+                                                styles.menuSection,
+                                                styles.menuTypeSection,
                                             ]}
                                         >
-                                            <Pressable
+                                            <Text
                                                 style={[
-                                                    styles.visibilityButton,
-                                                    playMode === "local"
-                                                        ? styles.visibilityButtonActive
-                                                        : null,
+                                                    styles.menuSectionLabel,
+                                                    { fontSize: subFontSize },
                                                 ]}
-                                                onPress={() =>
-                                                    selectPlayMode("local")
-                                                }
                                             >
-                                                <Text
-                                                    style={
-                                                        styles.visibilityText
-                                                    }
-                                                >
-                                                    {isSmallScreen
-                                                        ? "⌂ Local"
-                                                        : "Local"}
-                                                </Text>
-                                            </Pressable>
-                                            <Pressable
+                                                Joueur
+                                            </Text>
+                                            <TextInput
                                                 style={[
-                                                    styles.visibilityButton,
-                                                    playMode === "create"
-                                                        ? styles.visibilityButtonActive
-                                                        : null,
-                                                    remoteModesDisabled
-                                                        ? styles.visibilityButtonDisabled
-                                                        : null,
+                                                    styles.usernameInput,
+                                                    {
+                                                        marginTop: Math.max(
+                                                            2,
+                                                            lineSpacing - 1,
+                                                        ),
+                                                    },
                                                 ]}
-                                                onPress={() =>
-                                                    selectPlayMode("create")
-                                                }
-                                                disabled={remoteModesDisabled}
-                                            >
-                                                <Text
-                                                    style={
-                                                        styles.visibilityText
-                                                    }
-                                                >
-                                                    {isSmallScreen
-                                                        ? "＋ Créer"
-                                                        : "Créer remote"}
-                                                </Text>
-                                            </Pressable>
-                                            <Pressable
-                                                style={[
-                                                    styles.visibilityButton,
-                                                    playMode === "join"
-                                                        ? styles.visibilityButtonActive
-                                                        : null,
-                                                    remoteModesDisabled
-                                                        ? styles.visibilityButtonDisabled
-                                                        : null,
-                                                ]}
-                                                onPress={() =>
-                                                    selectPlayMode("join")
-                                                }
-                                                disabled={remoteModesDisabled}
-                                            >
-                                                <Text
-                                                    style={
-                                                        styles.visibilityText
-                                                    }
-                                                >
-                                                    {isSmallScreen
-                                                        ? "↔ Rejoindre"
-                                                        : "Rejoindre remote"}
-                                                </Text>
-                                            </Pressable>
+                                                value={playerUsername}
+                                                onChangeText={(text) => {
+                                                    setPlayerUsername(text);
+                                                }}
+                                                autoCapitalize="none"
+                                                autoCorrect={false}
+                                                maxLength={32}
+                                                placeholder="ex: alice"
+                                                placeholderTextColor="#94a3b8"
+                                            />
                                         </View>
-                                    </View>
 
-                                    <View
-                                        style={[
-                                            styles.menuSection,
-                                            styles.menuOptionsSection,
-                                        ]}
-                                    >
-                                        <Text
+                                        <View style={styles.menuSection}>
+                                            <Text
+                                                style={[
+                                                    styles.menuSectionLabel,
+                                                    { fontSize: subFontSize },
+                                                ]}
+                                            >
+                                                Type de partie
+                                            </Text>
+                                            <View
+                                                style={[
+                                                    styles.visibilityRow,
+                                                    {
+                                                        marginTop: Math.max(
+                                                            2,
+                                                            lineSpacing - 1,
+                                                        ),
+                                                        gap: lineSpacing,
+                                                        flexWrap: isSmallScreen
+                                                            ? "wrap"
+                                                            : "nowrap",
+                                                    },
+                                                ]}
+                                            >
+                                                <Pressable
+                                                    style={[
+                                                        styles.visibilityButton,
+                                                        playMode === "local"
+                                                            ? styles.visibilityButtonActive
+                                                            : null,
+                                                    ]}
+                                                    onPress={() =>
+                                                        selectPlayMode("local")
+                                                    }
+                                                >
+                                                    <Text
+                                                        style={
+                                                            styles.visibilityText
+                                                        }
+                                                    >
+                                                        {isSmallScreen
+                                                            ? "⌂ Local"
+                                                            : "Local"}
+                                                    </Text>
+                                                </Pressable>
+                                                <Pressable
+                                                    style={[
+                                                        styles.visibilityButton,
+                                                        playMode === "create"
+                                                            ? styles.visibilityButtonActive
+                                                            : null,
+                                                        remoteModesDisabled
+                                                            ? styles.visibilityButtonDisabled
+                                                            : null,
+                                                    ]}
+                                                    onPress={() =>
+                                                        selectPlayMode("create")
+                                                    }
+                                                    disabled={
+                                                        remoteModesDisabled
+                                                    }
+                                                >
+                                                    <Text
+                                                        style={
+                                                            styles.visibilityText
+                                                        }
+                                                    >
+                                                        {isSmallScreen
+                                                            ? "＋ Créer"
+                                                            : "Créer remote"}
+                                                    </Text>
+                                                </Pressable>
+                                                <Pressable
+                                                    style={[
+                                                        styles.visibilityButton,
+                                                        playMode === "join"
+                                                            ? styles.visibilityButtonActive
+                                                            : null,
+                                                        remoteModesDisabled
+                                                            ? styles.visibilityButtonDisabled
+                                                            : null,
+                                                    ]}
+                                                    onPress={() =>
+                                                        selectPlayMode("join")
+                                                    }
+                                                    disabled={
+                                                        remoteModesDisabled
+                                                    }
+                                                >
+                                                    <Text
+                                                        style={
+                                                            styles.visibilityText
+                                                        }
+                                                    >
+                                                        {isSmallScreen
+                                                            ? "↔ Rejoindre"
+                                                            : "Rejoindre remote"}
+                                                    </Text>
+                                                </Pressable>
+                                            </View>
+                                        </View>
+
+                                        <View
                                             style={[
-                                                styles.menuSectionLabel,
-                                                { fontSize: subFontSize },
+                                                styles.menuSection,
+                                                styles.menuOptionsSection,
                                             ]}
                                         >
-                                            Options de partie
-                                        </Text>
-                                        {playMode !== "join" ? (
-                                            <>
-                                                <Text
-                                                    style={[
-                                                        styles.cornerSub,
-                                                        {
-                                                            fontSize:
-                                                                subFontSize,
-                                                            marginTop:
-                                                                lineSpacing,
-                                                        },
-                                                    ]}
-                                                >
-                                                    Type des sièges
-                                                </Text>
-                                                {PLAYERS.map((color) => (
-                                                    <View
-                                                        key={`${color}-control`}
+                                            <Text
+                                                style={[
+                                                    styles.menuSectionLabel,
+                                                    { fontSize: subFontSize },
+                                                ]}
+                                            >
+                                                Options de partie
+                                            </Text>
+                                            {playMode !== "join" ? (
+                                                <>
+                                                    <Text
                                                         style={[
-                                                            styles.playerInputRow,
+                                                            styles.cornerSub,
+                                                            {
+                                                                fontSize:
+                                                                    subFontSize,
+                                                                marginTop:
+                                                                    lineSpacing,
+                                                            },
+                                                        ]}
+                                                    >
+                                                        Type des sièges
+                                                    </Text>
+                                                    {PLAYERS.map((color) => (
+                                                        <View
+                                                            key={`${color}-control`}
+                                                            style={[
+                                                                styles.playerInputRow,
+                                                                {
+                                                                    marginTop:
+                                                                        Math.max(
+                                                                            2,
+                                                                            lineSpacing -
+                                                                                1,
+                                                                        ),
+                                                                },
+                                                            ]}
+                                                        >
+                                                            <Text
+                                                                style={
+                                                                    styles.playerInputLabel
+                                                                }
+                                                            >
+                                                                {
+                                                                    PLAYER_LABEL[
+                                                                        color
+                                                                    ]
+                                                                }
+                                                            </Text>
+                                                            <View
+                                                                style={
+                                                                    styles.playerControlRow
+                                                                }
+                                                            >
+                                                                <Pressable
+                                                                    style={[
+                                                                        styles.controlButton,
+                                                                        controlByColor[
+                                                                            color
+                                                                        ] ===
+                                                                        "human"
+                                                                            ? styles.controlButtonActive
+                                                                            : null,
+                                                                    ]}
+                                                                    onPress={() =>
+                                                                        setPlayerControl(
+                                                                            color,
+                                                                            "human",
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Text
+                                                                        style={
+                                                                            styles.controlButtonText
+                                                                        }
+                                                                    >
+                                                                        Humain
+                                                                    </Text>
+                                                                </Pressable>
+                                                                <Pressable
+                                                                    style={[
+                                                                        styles.controlButton,
+                                                                        controlByColor[
+                                                                            color
+                                                                        ] ===
+                                                                        "robot"
+                                                                            ? styles.controlButtonActive
+                                                                            : null,
+                                                                        playMode ===
+                                                                            "create" &&
+                                                                        color ===
+                                                                            "white"
+                                                                            ? styles.controlButtonDisabled
+                                                                            : null,
+                                                                    ]}
+                                                                    onPress={() => {
+                                                                        if (
+                                                                            playMode ===
+                                                                                "create" &&
+                                                                            color ===
+                                                                                "white"
+                                                                        ) {
+                                                                            return;
+                                                                        }
+                                                                        setPlayerControl(
+                                                                            color,
+                                                                            "robot",
+                                                                        );
+                                                                    }}
+                                                                    disabled={
+                                                                        playMode ===
+                                                                            "create" &&
+                                                                        color ===
+                                                                            "white"
+                                                                    }
+                                                                >
+                                                                    <Text
+                                                                        style={
+                                                                            styles.controlButtonText
+                                                                        }
+                                                                    >
+                                                                        Robot
+                                                                    </Text>
+                                                                </Pressable>
+                                                            </View>
+                                                        </View>
+                                                    ))}
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Text
+                                                        style={[
+                                                            styles.cornerSub,
+                                                            {
+                                                                fontSize:
+                                                                    subFontSize,
+                                                                marginTop:
+                                                                    lineSpacing,
+                                                            },
+                                                        ]}
+                                                    >
+                                                        Parties disponibles
+                                                    </Text>
+                                                    <View
+                                                        style={[
+                                                            styles.joinableGamesContainer,
                                                             {
                                                                 marginTop:
                                                                     Math.max(
@@ -1692,486 +1817,406 @@ export default function App() {
                                                                         lineSpacing -
                                                                             1,
                                                                     ),
+                                                                gap: lineSpacing,
                                                             },
                                                         ]}
                                                     >
-                                                        <Text
-                                                            style={
-                                                                styles.playerInputLabel
-                                                            }
-                                                        >
-                                                            {
-                                                                PLAYER_LABEL[
-                                                                    color
-                                                                ]
-                                                            }
-                                                        </Text>
-                                                        <View
-                                                            style={
-                                                                styles.playerControlRow
-                                                            }
-                                                        >
-                                                            <Pressable
-                                                                style={[
-                                                                    styles.controlButton,
-                                                                    controlByColor[
-                                                                        color
-                                                                    ] ===
-                                                                    "human"
-                                                                        ? styles.controlButtonActive
-                                                                        : null,
-                                                                ]}
-                                                                onPress={() =>
-                                                                    setPlayerControl(
-                                                                        color,
-                                                                        "human",
-                                                                    )
-                                                                }
-                                                            >
-                                                                <Text
-                                                                    style={
-                                                                        styles.controlButtonText
-                                                                    }
-                                                                >
-                                                                    Humain
-                                                                </Text>
-                                                            </Pressable>
-                                                            <Pressable
-                                                                style={[
-                                                                    styles.controlButton,
-                                                                    controlByColor[
-                                                                        color
-                                                                    ] ===
-                                                                    "robot"
-                                                                        ? styles.controlButtonActive
-                                                                        : null,
-                                                                    playMode ===
-                                                                        "create" &&
-                                                                    color ===
-                                                                        "white"
-                                                                        ? styles.controlButtonDisabled
-                                                                        : null,
-                                                                ]}
-                                                                onPress={() => {
-                                                                    if (
-                                                                        playMode ===
-                                                                            "create" &&
-                                                                        color ===
-                                                                            "white"
-                                                                    ) {
-                                                                        return;
-                                                                    }
-                                                                    setPlayerControl(
-                                                                        color,
-                                                                        "robot",
+                                                        {joinableGames.map(
+                                                            (game) => {
+                                                                const freeSeats =
+                                                                    freeSeatsOf(
+                                                                        game.player_ids,
                                                                     );
-                                                                }}
-                                                                disabled={
-                                                                    playMode ===
-                                                                        "create" &&
-                                                                    color ===
-                                                                        "white"
-                                                                }
-                                                            >
-                                                                <Text
-                                                                    style={
-                                                                        styles.controlButtonText
-                                                                    }
-                                                                >
-                                                                    Robot
-                                                                </Text>
-                                                            </Pressable>
-                                                        </View>
-                                                    </View>
-                                                ))}
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Text
-                                                    style={[
-                                                        styles.cornerSub,
-                                                        {
-                                                            fontSize:
-                                                                subFontSize,
-                                                            marginTop:
-                                                                lineSpacing,
-                                                        },
-                                                    ]}
-                                                >
-                                                    Parties disponibles
-                                                </Text>
-                                                <View
-                                                    style={[
-                                                        styles.joinableGamesContainer,
-                                                        {
-                                                            marginTop: Math.max(
-                                                                2,
-                                                                lineSpacing - 1,
-                                                            ),
-                                                            gap: lineSpacing,
-                                                        },
-                                                    ]}
-                                                >
-                                                    {joinableGames.map(
-                                                        (game) => {
-                                                            const freeSeats =
-                                                                freeSeatsOf(
-                                                                    game.player_ids,
-                                                                );
-                                                            return (
-                                                                <Pressable
-                                                                    key={
-                                                                        game.id
-                                                                    }
-                                                                    style={[
-                                                                        styles.joinableGameButton,
-                                                                        selectedJoinGameId ===
-                                                                        game.id
-                                                                            ? styles.visibilityButtonActive
-                                                                            : null,
-                                                                        !supabaseConfigured
-                                                                            ? styles.joinableGameButtonDisabled
-                                                                            : null,
-                                                                    ]}
-                                                                    onPress={() => {
-                                                                        if (
-                                                                            supabaseConfigured
-                                                                        ) {
-                                                                            setSelectedJoinGameId(
-                                                                                game.id,
-                                                                            );
+                                                                return (
+                                                                    <Pressable
+                                                                        key={
+                                                                            game.id
                                                                         }
-                                                                    }}
-                                                                    disabled={
-                                                                        !supabaseConfigured
-                                                                    }
-                                                                >
-                                                                    <Text
-                                                                        style={
-                                                                            styles.joinableGameTitle
+                                                                        style={[
+                                                                            styles.joinableGameButton,
+                                                                            selectedJoinGameId ===
+                                                                            game.id
+                                                                                ? styles.visibilityButtonActive
+                                                                                : null,
+                                                                            !supabaseConfigured
+                                                                                ? styles.joinableGameButtonDisabled
+                                                                                : null,
+                                                                        ]}
+                                                                        onPress={() => {
+                                                                            if (
+                                                                                supabaseConfigured
+                                                                            ) {
+                                                                                setSelectedJoinGameId(
+                                                                                    game.id,
+                                                                                );
+                                                                            }
+                                                                        }}
+                                                                        disabled={
+                                                                            !supabaseConfigured
                                                                         }
                                                                     >
-                                                                        {game.id.slice(
-                                                                            0,
-                                                                            8,
-                                                                        )}
-                                                                        ...
-                                                                    </Text>
-                                                                    <Text
-                                                                        style={
-                                                                            styles.joinableGameSub
-                                                                        }
-                                                                    >
-                                                                        Places
-                                                                        libres:{" "}
-                                                                        {freeSeats
-                                                                            .map(
-                                                                                (
-                                                                                    color,
-                                                                                ) =>
-                                                                                    PLAYER_LABEL[
-                                                                                        color
-                                                                                    ],
-                                                                            )
-                                                                            .join(
-                                                                                ", ",
+                                                                        <Text
+                                                                            style={
+                                                                                styles.joinableGameTitle
+                                                                            }
+                                                                        >
+                                                                            {game.id.slice(
+                                                                                0,
+                                                                                8,
                                                                             )}
-                                                                    </Text>
-                                                                </Pressable>
-                                                            );
-                                                        },
-                                                    )}
-                                                    {joinableGames.length ===
-                                                    0 ? (
-                                                        <Text
-                                                            style={
-                                                                styles.cornerSub
-                                                            }
-                                                        >
-                                                            Aucune partie
-                                                            joignable.
-                                                        </Text>
-                                                    ) : null}
-                                                    <Pressable
-                                                        style={[
-                                                            styles.refreshJoinablesButton,
-                                                            !canRefreshJoinables
-                                                                ? styles.joinColorButtonDisabled
-                                                                : null,
-                                                        ]}
-                                                        onPress={
-                                                            loadJoinableGames
-                                                        }
-                                                        disabled={
-                                                            !canRefreshJoinables
-                                                        }
-                                                    >
-                                                        <Text
-                                                            style={
-                                                                styles.resetText
-                                                            }
-                                                        >
-                                                            {loadingJoinableGames
-                                                                ? "Chargement..."
-                                                                : "Rafraîchir la liste"}
-                                                        </Text>
-                                                    </Pressable>
-                                                </View>
-                                                <Text
-                                                    style={[
-                                                        styles.cornerSub,
-                                                        {
-                                                            fontSize:
-                                                                subFontSize,
-                                                            marginTop:
-                                                                lineSpacing,
-                                                        },
-                                                    ]}
-                                                >
-                                                    Couleur à rejoindre
-                                                </Text>
-                                                <View
-                                                    style={[
-                                                        styles.visibilityRow,
-                                                        {
-                                                            marginTop: Math.max(
-                                                                2,
-                                                                lineSpacing - 1,
-                                                            ),
-                                                            gap: lineSpacing,
-                                                            flexWrap: "wrap",
-                                                        },
-                                                    ]}
-                                                >
-                                                    {PLAYERS.map((color) => {
-                                                        const isSeatFree =
-                                                            Boolean(
-                                                                selectedJoinGame,
-                                                            ) &&
-                                                            selectedJoinGameFreeSeats.includes(
-                                                                color,
-                                                            );
-                                                        return (
-                                                            <Pressable
-                                                                key={`join-${color}`}
-                                                                style={[
-                                                                    styles.joinColorButton,
-                                                                    joinColor ===
-                                                                    color
-                                                                        ? styles.visibilityButtonActive
-                                                                        : null,
-                                                                    !isSeatFree
-                                                                        ? styles.joinColorButtonDisabled
-                                                                        : null,
-                                                                ]}
-                                                                onPress={() => {
-                                                                    if (
-                                                                        isSeatFree
-                                                                    ) {
-                                                                        setJoinColor(
-                                                                            color,
-                                                                        );
-                                                                    }
-                                                                }}
-                                                                disabled={
-                                                                    !isSeatFree
+                                                                            ...
+                                                                        </Text>
+                                                                        <Text
+                                                                            style={
+                                                                                styles.joinableGameSub
+                                                                            }
+                                                                        >
+                                                                            Places
+                                                                            libres:{" "}
+                                                                            {freeSeats
+                                                                                .map(
+                                                                                    (
+                                                                                        color,
+                                                                                    ) =>
+                                                                                        PLAYER_LABEL[
+                                                                                            color
+                                                                                        ],
+                                                                                )
+                                                                                .join(
+                                                                                    ", ",
+                                                                                )}
+                                                                        </Text>
+                                                                    </Pressable>
+                                                                );
+                                                            },
+                                                        )}
+                                                        {joinableGames.length ===
+                                                        0 ? (
+                                                            <Text
+                                                                style={
+                                                                    styles.cornerSub
                                                                 }
                                                             >
-                                                                <Text
-                                                                    style={
-                                                                        styles.visibilityText
-                                                                    }
-                                                                >
-                                                                    {
-                                                                        PLAYER_LABEL[
+                                                                Aucune partie
+                                                                joignable.
+                                                            </Text>
+                                                        ) : null}
+                                                        <Pressable
+                                                            style={[
+                                                                styles.refreshJoinablesButton,
+                                                                !canRefreshJoinables
+                                                                    ? styles.joinColorButtonDisabled
+                                                                    : null,
+                                                            ]}
+                                                            onPress={
+                                                                loadJoinableGames
+                                                            }
+                                                            disabled={
+                                                                !canRefreshJoinables
+                                                            }
+                                                        >
+                                                            <Text
+                                                                style={
+                                                                    styles.resetText
+                                                                }
+                                                            >
+                                                                {loadingJoinableGames
+                                                                    ? "Chargement..."
+                                                                    : "Rafraîchir la liste"}
+                                                            </Text>
+                                                        </Pressable>
+                                                    </View>
+                                                    <Text
+                                                        style={[
+                                                            styles.cornerSub,
+                                                            {
+                                                                fontSize:
+                                                                    subFontSize,
+                                                                marginTop:
+                                                                    lineSpacing,
+                                                            },
+                                                        ]}
+                                                    >
+                                                        Couleur à rejoindre
+                                                    </Text>
+                                                    <View
+                                                        style={[
+                                                            styles.visibilityRow,
+                                                            {
+                                                                marginTop:
+                                                                    Math.max(
+                                                                        2,
+                                                                        lineSpacing -
+                                                                            1,
+                                                                    ),
+                                                                gap: lineSpacing,
+                                                                flexWrap:
+                                                                    "wrap",
+                                                            },
+                                                        ]}
+                                                    >
+                                                        {PLAYERS.map(
+                                                            (color) => {
+                                                                const isSeatFree =
+                                                                    Boolean(
+                                                                        selectedJoinGame,
+                                                                    ) &&
+                                                                    selectedJoinGameFreeSeats.includes(
+                                                                        color,
+                                                                    );
+                                                                return (
+                                                                    <Pressable
+                                                                        key={`join-${color}`}
+                                                                        style={[
+                                                                            styles.joinColorButton,
+                                                                            joinColor ===
                                                                             color
-                                                                        ]
-                                                                    }
-                                                                </Text>
-                                                            </Pressable>
-                                                        );
-                                                    })}
-                                                </View>
-                                            </>
-                                        )}
+                                                                                ? styles.visibilityButtonActive
+                                                                                : null,
+                                                                            !isSeatFree
+                                                                                ? styles.joinColorButtonDisabled
+                                                                                : null,
+                                                                        ]}
+                                                                        onPress={() => {
+                                                                            if (
+                                                                                isSeatFree
+                                                                            ) {
+                                                                                setJoinColor(
+                                                                                    color,
+                                                                                );
+                                                                            }
+                                                                        }}
+                                                                        disabled={
+                                                                            !isSeatFree
+                                                                        }
+                                                                    >
+                                                                        <Text
+                                                                            style={
+                                                                                styles.visibilityText
+                                                                            }
+                                                                        >
+                                                                            {
+                                                                                PLAYER_LABEL[
+                                                                                    color
+                                                                                ]
+                                                                            }
+                                                                        </Text>
+                                                                    </Pressable>
+                                                                );
+                                                            },
+                                                        )}
+                                                    </View>
+                                                </>
+                                            )}
+                                        </View>
                                     </View>
-                                </View>
 
-                                <View
-                                    style={[
-                                        styles.menuActionsBlock,
-                                        { gap: lineSpacing * 1.5 },
-                                    ]}
-                                >
-                                    <Pressable
+                                    <View
                                         style={[
-                                            styles.menuButtonSecondary,
-                                            {
-                                                paddingVertical:
-                                                    resetButtonVerticalPadding,
-                                                paddingHorizontal:
-                                                    resetButtonHorizontalPadding,
-                                                borderRadius: clamp(
-                                                    Math.floor(
-                                                        panelRadius * 0.7,
-                                                    ),
-                                                    5,
-                                                    10,
-                                                ),
-                                                opacity: canResumeRemoteGame
-                                                    ? 1
-                                                    : 0.45,
-                                            },
+                                            styles.menuActionsBlock,
+                                            { gap: lineSpacing * 1.5 },
                                         ]}
-                                        onPress={resumePendingRemoteGame}
-                                        disabled={!canResumeRemoteGame}
                                     >
-                                        <Text
+                                        <Pressable
                                             style={[
-                                                styles.resetText,
-                                                { fontSize: buttonFontSize },
-                                            ]}
-                                        >
-                                            {isSmallScreen
-                                                ? "↺ Reprendre remote"
-                                                : "Reprendre partie distante"}
-                                        </Text>
-                                    </Pressable>
-
-                                    <Pressable
-                                        style={[
-                                            styles.menuButtonSecondary,
-                                            {
-                                                paddingVertical:
-                                                    resetButtonVerticalPadding,
-                                                paddingHorizontal:
-                                                    resetButtonHorizontalPadding,
-                                                borderRadius: clamp(
-                                                    Math.floor(
-                                                        panelRadius * 0.7,
-                                                    ),
-                                                    5,
-                                                    10,
-                                                ),
-                                                opacity: supabaseConfigured
-                                                    ? 1
-                                                    : 0.5,
-                                            },
-                                        ]}
-                                        onPress={
-                                            playMode === "local"
-                                                ? startLocalGame
-                                                : playMode === "create"
-                                                  ? onCreateRemote
-                                                  : onJoinRemote
-                                        }
-                                        disabled={
-                                            !supabaseConfigured &&
-                                            playMode !== "local"
-                                        }
-                                    >
-                                        <Text
-                                            style={[
-                                                styles.resetText,
-                                                { fontSize: buttonFontSize },
-                                            ]}
-                                        >
-                                            {playMode === "local"
-                                                ? isSmallScreen
-                                                    ? "▶ Nouvelle partie"
-                                                    : "Nouvelle partie"
-                                                : playMode === "create"
-                                                  ? isSmallScreen
-                                                      ? "＋ Créer remote"
-                                                      : "Créer remote"
-                                                  : isSmallScreen
-                                                    ? "↔ Rejoindre"
-                                                    : "Rejoindre"}
-                                        </Text>
-                                    </Pressable>
-
-                                    {!supabaseConfigured ? (
-                                        <Text
-                                            style={[
-                                                styles.cornerSub,
+                                                styles.menuButtonSecondary,
                                                 {
-                                                    fontSize: subFontSize,
-                                                    color: "#fca5a5",
+                                                    paddingVertical:
+                                                        resetButtonVerticalPadding,
+                                                    paddingHorizontal:
+                                                        resetButtonHorizontalPadding,
+                                                    borderRadius: clamp(
+                                                        Math.floor(
+                                                            panelRadius * 0.7,
+                                                        ),
+                                                        5,
+                                                        10,
+                                                    ),
+                                                    opacity: canResumeRemoteGame
+                                                        ? 1
+                                                        : 0.45,
                                                 },
                                             ]}
+                                            onPress={resumePendingRemoteGame}
+                                            disabled={!canResumeRemoteGame}
                                         >
-                                            Supabase non configuré (.env requis)
-                                        </Text>
-                                    ) : null}
+                                            <Text
+                                                style={[
+                                                    styles.resetText,
+                                                    {
+                                                        fontSize:
+                                                            buttonFontSize,
+                                                    },
+                                                ]}
+                                            >
+                                                {isSmallScreen
+                                                    ? "↺ Reprendre remote"
+                                                    : "Reprendre partie distante"}
+                                            </Text>
+                                        </Pressable>
+
+                                        <Pressable
+                                            style={[
+                                                styles.menuButtonSecondary,
+                                                {
+                                                    paddingVertical:
+                                                        resetButtonVerticalPadding,
+                                                    paddingHorizontal:
+                                                        resetButtonHorizontalPadding,
+                                                    borderRadius: clamp(
+                                                        Math.floor(
+                                                            panelRadius * 0.7,
+                                                        ),
+                                                        5,
+                                                        10,
+                                                    ),
+                                                    opacity: supabaseConfigured
+                                                        ? 1
+                                                        : 0.5,
+                                                },
+                                            ]}
+                                            onPress={
+                                                playMode === "local"
+                                                    ? startLocalGame
+                                                    : playMode === "create"
+                                                      ? onCreateRemote
+                                                      : onJoinRemote
+                                            }
+                                            disabled={
+                                                !supabaseConfigured &&
+                                                playMode !== "local"
+                                            }
+                                        >
+                                            <Text
+                                                style={[
+                                                    styles.resetText,
+                                                    {
+                                                        fontSize:
+                                                            buttonFontSize,
+                                                    },
+                                                ]}
+                                            >
+                                                {playMode === "local"
+                                                    ? isSmallScreen
+                                                        ? "▶ Nouvelle partie"
+                                                        : "Nouvelle partie"
+                                                    : playMode === "create"
+                                                      ? isSmallScreen
+                                                          ? "＋ Créer remote"
+                                                          : "Créer remote"
+                                                      : isSmallScreen
+                                                        ? "↔ Rejoindre"
+                                                        : "Rejoindre"}
+                                            </Text>
+                                        </Pressable>
+
+                                        {!supabaseConfigured ? (
+                                            <Text
+                                                style={[
+                                                    styles.cornerSub,
+                                                    {
+                                                        fontSize: subFontSize,
+                                                        color: "#fca5a5",
+                                                    },
+                                                ]}
+                                            >
+                                                Supabase non configuré (.env
+                                                requis)
+                                            </Text>
+                                        ) : null}
+                                    </View>
                                 </View>
-                            </View>
-                        ) : (
-                            <>
-                                <View
-                                    style={[
-                                        styles.collapsedMenuActions,
-                                        {
-                                            marginTop: lineSpacing * 1.5,
-                                            gap: lineSpacing,
-                                        },
-                                    ]}
-                                >
-                                    <View style={styles.visibilityRow}>
-                                        {canUseRemote ? (
+                            ) : (
+                                <>
+                                    <View
+                                        style={[
+                                            styles.collapsedMenuActions,
+                                            {
+                                                marginTop: 0,
+                                            },
+                                        ]}
+                                    >
+                                        <View style={styles.inGameTopActions}>
+                                            <View
+                                                style={[
+                                                    styles.remoteStatusBanner,
+                                                    canUseRemote &&
+                                                    waitingPlayersMessage
+                                                        ? styles.remoteStatusBannerWarning
+                                                        : null,
+                                                    !canUseRemote
+                                                        ? styles.remoteStatusBannerLocal
+                                                        : null,
+                                                ]}
+                                            >
+                                                <Text
+                                                    style={[
+                                                        styles.remoteStatusText,
+                                                        canUseRemote &&
+                                                        waitingPlayersMessage
+                                                            ? styles.remoteStatusWarning
+                                                            : null,
+                                                        !canUseRemote
+                                                            ? styles.remoteStatusTextLocal
+                                                            : null,
+                                                    ]}
+                                                    numberOfLines={1}
+                                                    ellipsizeMode="tail"
+                                                >
+                                                    {canUseRemote
+                                                        ? (waitingPlayersMessage ??
+                                                          "Tous les joueurs sont connectés")
+                                                        : "Mode local: partie en cours"}
+                                                </Text>
+                                            </View>
                                             <Pressable
                                                 style={[
-                                                    styles.menuButtonSecondary,
-                                                    styles.collapsedActionButton,
+                                                    styles.iconActionButton,
+                                                    styles.iconActionSync,
                                                     {
                                                         opacity:
+                                                            canUseRemote &&
                                                             supabaseConfigured
                                                                 ? 1
-                                                                : 0.5,
+                                                                : 0.45,
                                                     },
                                                 ]}
                                                 onPress={onSyncRemote}
-                                                disabled={!supabaseConfigured}
+                                                disabled={
+                                                    !canUseRemote ||
+                                                    !supabaseConfigured
+                                                }
                                             >
-                                                <Text style={styles.resetText}>
-                                                    ⟳ Sync
+                                                <Text
+                                                    style={
+                                                        styles.iconActionText
+                                                    }
+                                                >
+                                                    ↻
                                                 </Text>
                                             </Pressable>
-                                        ) : null}
-                                        <Pressable
-                                            style={[
-                                                styles.resetButton,
-                                                styles.collapsedActionButton,
-                                                {
-                                                    marginLeft: canUseRemote
-                                                        ? lineSpacing
-                                                        : 0,
-                                                },
-                                            ]}
-                                            onPress={onQuitGame}
-                                        >
-                                            <Text style={styles.resetText}>
-                                                ⏹ Quitter
-                                            </Text>
-                                        </Pressable>
+                                            <Pressable
+                                                style={[
+                                                    styles.iconActionButton,
+                                                    styles.iconActionQuit,
+                                                ]}
+                                                onPress={onQuitGame}
+                                            >
+                                                <Text
+                                                    style={
+                                                        styles.iconActionText
+                                                    }
+                                                >
+                                                    ✕
+                                                </Text>
+                                            </Pressable>
+                                        </View>
                                     </View>
-                                    {canUseRemote ? (
-                                        <Text
-                                            style={[
-                                                styles.remoteStatusText,
-                                                waitingPlayersMessage
-                                                    ? styles.remoteStatusWarning
-                                                    : null,
-                                            ]}
-                                        >
-                                            {waitingPlayersMessage ??
-                                                "Statut remote: tous les joueurs sont connectés"}
-                                        </Text>
-                                    ) : null}
-                                </View>
-                            </>
-                        )}
+                                </>
+                            )}
+                        </View>
                     </View>
-                </View>
+                ) : null}
 
                 {isInGame ? (
                     <View
@@ -2181,6 +2226,83 @@ export default function App() {
                         ]}
                     >
                         <>
+                            <View
+                                style={[
+                                    styles.stageTopBar,
+                                    {
+                                        top: stageGap,
+                                        left: 0,
+                                        right: 0,
+                                        paddingHorizontal: isSmallScreen ? 6 : stageGap,
+                                    },
+                                ]}
+                            >
+                                <View
+                                    style={[
+                                        styles.remoteStatusBanner,
+                                        canUseRemote && waitingPlayersMessage
+                                            ? styles.remoteStatusBannerWarning
+                                            : null,
+                                        !canUseRemote
+                                            ? styles.remoteStatusBannerLocal
+                                            : null,
+                                    ]}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.remoteStatusText,
+                                            canUseRemote &&
+                                            waitingPlayersMessage
+                                                ? styles.remoteStatusWarning
+                                                : null,
+                                            !canUseRemote
+                                                ? styles.remoteStatusTextLocal
+                                                : null,
+                                        ]}
+                                        numberOfLines={1}
+                                        ellipsizeMode="tail"
+                                    >
+                                        {canUseRemote
+                                            ? (waitingPlayersMessage ??
+                                              "Tous les joueurs sont connectés")
+                                            : "Mode local: partie en cours"}
+                                    </Text>
+                                </View>
+                                <View style={styles.inGameTopActions}>
+                                    <Pressable
+                                        style={[
+                                            styles.iconActionButton,
+                                            styles.iconActionSync,
+                                            {
+                                                opacity:
+                                                    canUseRemote &&
+                                                    supabaseConfigured
+                                                        ? 1
+                                                        : 0.45,
+                                            },
+                                        ]}
+                                        onPress={onSyncRemote}
+                                        disabled={
+                                            !canUseRemote || !supabaseConfigured
+                                        }
+                                    >
+                                        <Text style={styles.iconActionText}>
+                                            ↻
+                                        </Text>
+                                    </Pressable>
+                                    <Pressable
+                                        style={[
+                                            styles.iconActionButton,
+                                            styles.iconActionQuit,
+                                        ]}
+                                        onPress={onQuitGame}
+                                    >
+                                        <Text style={styles.iconActionText}>
+                                            ✕
+                                        </Text>
+                                    </Pressable>
+                                </View>
+                            </View>
                             <View style={styles.boardLayer}>
                                 <View
                                     style={[
@@ -2702,6 +2824,13 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "center",
     },
+    stageTopBar: {
+        position: "absolute",
+        zIndex: 5,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+    },
     cornerPanel: {
         flex: 1,
         backgroundColor: "rgba(15, 23, 42, 0.76)",
@@ -2779,9 +2908,6 @@ const styles = StyleSheet.create({
         },
         elevation: 3,
     },
-    resetButton: {
-        backgroundColor: "#1d4ed8",
-    },
     menuButtonSecondary: {
         backgroundColor: "rgba(51, 65, 85, 0.9)",
     },
@@ -2789,18 +2915,66 @@ const styles = StyleSheet.create({
         flexDirection: "row",
     },
     collapsedMenuActions: {
-        gap: 6,
+        gap: 0,
     },
-    collapsedActionButton: {
+    inGameTopActions: {
+        // width: "100%",
+        flexshrink: 1,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        // gap: 8,
+    },
+    iconActionButton: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        alignItems: "center",
+        justifyContent: "center",
+        borderWidth: 1,
+    },
+    iconActionSync: {
+        backgroundColor: "rgba(59, 130, 246, 0.18)",
+        borderColor: "rgba(96, 165, 250, 0.55)",
+    },
+    iconActionQuit: {
+        backgroundColor: "rgba(239, 68, 68, 0.2)",
+        borderColor: "rgba(248, 113, 113, 0.6)",
+    },
+    iconActionText: {
+        color: "#f8fafc",
+        fontWeight: "800",
+        fontSize: 20,
+        lineHeight: 22,
+        textAlign: "center",
+    },
+    remoteStatusBanner: {
         flex: 1,
-        borderRadius: 8,
-        paddingVertical: 7,
-        paddingHorizontal: 9,
+        minWidth: 0,
+        flexShrink: 1,
+        borderWidth: 1,
+        borderColor: "rgba(147, 197, 253, 0.45)",
+        backgroundColor: "rgba(30, 58, 138, 0.25)",
+        borderRadius: 10,
+        paddingVertical: 8,
+        paddingHorizontal: 10,
+    },
+    remoteStatusBannerWarning: {
+        borderColor: "rgba(248, 113, 113, 0.5)",
+        backgroundColor: "rgba(127, 29, 29, 0.25)",
+    },
+    remoteStatusBannerLocal: {
+        borderColor: "rgba(148, 163, 184, 0.4)",
+        backgroundColor: "rgba(30, 41, 59, 0.35)",
     },
     remoteStatusText: {
-        color: "#93c5fd",
+        color: "#bfdbfe",
         fontSize: 12,
         lineHeight: 16,
+        textAlign: "center",
+    },
+    remoteStatusTextLocal: {
+        color: "#cbd5e1",
     },
     remoteStatusWarning: {
         color: "#fca5a5",
