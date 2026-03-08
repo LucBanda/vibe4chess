@@ -33,9 +33,10 @@ Puis dans Expo Go iOS:
 ## Vérifications automatiques
 
 - `npm run test:unit`: tests unitaires Node
+- `npm run test:e2e`: tests end-to-end (flux local complet)
 - `npm run test:web-build`: build web Expo (détecte régressions de bundling web)
 - `npm run test:expo-health`: contrôle de compatibilité SDK/dépendances Expo
-- `npm test`: enchaîne les 3 checks ci-dessus
+- `npm test`: enchaîne les 4 checks ci-dessus
 
 ## Variables d'environnement
 

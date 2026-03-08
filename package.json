@@ -11,10 +11,11 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "agents:start": "./scripts/agents-start.sh",
-    "test:unit": "node --test",
+    "test:unit": "node --test test/*.test.js",
     "test:web-build": "CI=1 expo export -p web",
     "test:expo-health": "CI=1 npx expo-doctor",
-    "test": "npm run test:unit && npm run test:web-build && npm run test:expo-health"
+    "test": "npm run test:unit && npm run test:e2e && npm run test:web-build && npm run test:expo-health",
+    "test:e2e": "node --test test/e2e/*.e2e.test.js"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
