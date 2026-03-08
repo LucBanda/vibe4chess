@@ -100,6 +100,7 @@ export default function App() {
     const normalizedPlayerUsername = normalizeUsername(playerUsername, "player");
 
     const isCompactLayout = width < 980;
+    const isSmallScreen = width < 700;
     const effectiveSidebarWidth = isCompactLayout ? 0 : sidebarMeasuredWidth;
     const shortSide = Math.min(width, height);
     const stageWidth = Math.max(width - effectiveSidebarWidth, 220);
@@ -122,10 +123,11 @@ export default function App() {
     const panelVerticalPadding = clamp(Math.floor(shortSide * 0.016), 8, 16);
     const panelRadius = clamp(Math.floor(shortSide * 0.02), 8, 14);
 
-    const titleFontSize = clamp(Math.floor(shortSide * 0.027), 12, 18);
-    const valueFontSize = clamp(Math.floor(shortSide * 0.032), 14, 21);
-    const subFontSize = clamp(Math.floor(shortSide * 0.022), 11, 15);
-    const buttonFontSize = clamp(Math.floor(menuShortSide * 0.1), 10, 14);
+    const menuScale = isSmallScreen ? 0.84 : 1;
+    const titleFontSize = clamp(Math.floor(shortSide * 0.027 * menuScale), 10, 18);
+    const valueFontSize = clamp(Math.floor(shortSide * 0.032 * menuScale), 12, 21);
+    const subFontSize = clamp(Math.floor(shortSide * 0.022 * menuScale), 10, 15);
+    const buttonFontSize = clamp(Math.floor(menuShortSide * 0.1 * menuScale), 9, 14);
     const pieceFontSize = clamp(Math.floor(squareSize * 0.58), 10, 32);
     const pieceBadgeSize = clamp(Math.floor(squareSize * 0.74), 14, 46);
 
@@ -983,9 +985,11 @@ export default function App() {
                         styles.sidebar,
                         {
                             maxWidth: isCompactLayout
-                                ? width
+                                ? Math.min(width, isSmallScreen ? 420 : width)
                                 : Math.floor(width * 0.45),
-                            padding: panelVerticalPadding,
+                            padding: isSmallScreen
+                                ? Math.max(6, panelVerticalPadding - 3)
+                                : panelVerticalPadding,
                             gap: stageGap,
                             borderRightWidth: isCompactLayout ? 0 : 1,
                             borderBottomWidth: isCompactLayout ? 1 : 0,
@@ -1101,7 +1105,11 @@ export default function App() {
                                 <View
                                     style={[
                                         styles.visibilityRow,
-                                        { marginTop: lineSpacing, gap: lineSpacing },
+                                        {
+                                            marginTop: lineSpacing,
+                                            gap: lineSpacing,
+                                            flexWrap: isSmallScreen ? "wrap" : "nowrap",
+                                        },
                                     ]}
                                 >
                                     <Pressable
@@ -1113,7 +1121,9 @@ export default function App() {
                                         ]}
                                         onPress={() => selectPlayMode("local")}
                                     >
-                                        <Text style={styles.visibilityText}>Local</Text>
+                                        <Text style={styles.visibilityText}>
+                                            {isSmallScreen ? "⌂ Local" : "Local"}
+                                        </Text>
                                     </Pressable>
                                     <Pressable
                                         style={[
@@ -1124,7 +1134,9 @@ export default function App() {
                                         ]}
                                         onPress={() => selectPlayMode("create")}
                                     >
-                                        <Text style={styles.visibilityText}>Créer remote</Text>
+                                        <Text style={styles.visibilityText}>
+                                            {isSmallScreen ? "＋ Créer" : "Créer remote"}
+                                        </Text>
                                     </Pressable>
                                     <Pressable
                                         style={[
@@ -1135,7 +1147,9 @@ export default function App() {
                                         ]}
                                         onPress={() => selectPlayMode("join")}
                                     >
-                                        <Text style={styles.visibilityText}>Rejoindre remote</Text>
+                                        <Text style={styles.visibilityText}>
+                                            {isSmallScreen ? "↔ Rejoindre" : "Rejoindre remote"}
+                                        </Text>
                                     </Pressable>
                                 </View>
 
@@ -1336,13 +1350,15 @@ export default function App() {
                                     onPress={resumeSavedLocalGame}
                                     disabled={!canResumeLocalGame}
                                 >
-                                    <Text
-                                        style={[
-                                            styles.resetText,
-                                            { fontSize: buttonFontSize },
-                                        ]}
-                                    >
-                                        Reprendre partie locale
+                                        <Text
+                                            style={[
+                                                styles.resetText,
+                                                { fontSize: buttonFontSize },
+                                            ]}
+                                        >
+                                        {isSmallScreen
+                                            ? "↺ Reprendre locale"
+                                            : "Reprendre partie locale"}
                                     </Text>
                                 </Pressable>
 
@@ -1371,17 +1387,23 @@ export default function App() {
                                     }
                                     disabled={!supabaseConfigured && playMode !== "local"}
                                 >
-                                    <Text
-                                        style={[
-                                            styles.resetText,
-                                            { fontSize: buttonFontSize },
-                                        ]}
-                                    >
+                                        <Text
+                                            style={[
+                                                styles.resetText,
+                                                { fontSize: buttonFontSize },
+                                            ]}
+                                        >
                                         {playMode === "local"
-                                            ? "Nouvelle partie"
+                                            ? isSmallScreen
+                                                ? "▶ Nouvelle partie"
+                                                : "Nouvelle partie"
                                             : playMode === "create"
-                                                ? "Créer remote"
-                                                : "Rejoindre"}
+                                                ? isSmallScreen
+                                                    ? "＋ Créer remote"
+                                                    : "Créer remote"
+                                                : isSmallScreen
+                                                    ? "↔ Rejoindre"
+                                                    : "Rejoindre"}
                                     </Text>
                                 </Pressable>
                             </>
@@ -1424,7 +1446,7 @@ export default function App() {
                                                 { fontSize: buttonFontSize },
                                             ]}
                                         >
-                                            Synchroniser
+                                            {isSmallScreen ? "⟳ Sync" : "Synchroniser"}
                                         </Text>
                                     </Pressable>
                                 ) : null}
@@ -1445,13 +1467,13 @@ export default function App() {
                                     ]}
                                     onPress={onQuitGame}
                                 >
-                                    <Text
-                                        style={[
-                                            styles.resetText,
-                                            { fontSize: buttonFontSize },
-                                        ]}
-                                    >
-                                        Quitter la partie
+                                        <Text
+                                            style={[
+                                                styles.resetText,
+                                                { fontSize: buttonFontSize },
+                                            ]}
+                                        >
+                                        {isSmallScreen ? "⏹ Quitter" : "Quitter la partie"}
                                     </Text>
                                 </Pressable>
                             </>
