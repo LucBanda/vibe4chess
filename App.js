@@ -52,8 +52,28 @@ import {
     setActiveLocalUsername,
 } from "./src/lib/localSession.js";
 
+const LIGHT_PIECE_SYMBOL = {
+    king: "♔",
+    queen: "♕",
+    rook: "♖",
+    bishop: "♗",
+    knight: "♘",
+    pawn: "♙",
+};
+
 function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
+}
+
+function symbolForPiece(piece) {
+    if (!piece) {
+        return "";
+    }
+    // Expo Go iOS may render black-symbol glyphs in fixed black; use light glyphs for non-black teams.
+    if (piece.player === "black") {
+        return PIECE_SYMBOL[piece.type] ?? "";
+    }
+    return LIGHT_PIECE_SYMBOL[piece.type] ?? PIECE_SYMBOL[piece.type] ?? "";
 }
 
 export default function App() {
@@ -1558,7 +1578,7 @@ export default function App() {
                                                     },
                                                 ]}
                                             >
-                                                {PIECE_SYMBOL[piece.type]}
+                                                {symbolForPiece(piece)}
                                             </Text>
                                         ) : null}
                                     </Pressable>
