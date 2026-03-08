@@ -78,6 +78,7 @@ export default function App() {
     const [isInGame, setIsInGame] = useState(false);
     const [playMode, setPlayMode] = useState("local");
     const [remoteGameId, setRemoteGameId] = useState(null);
+    const [remotePlayerIds, setRemotePlayerIds] = useState({});
     const [isRemoteOwner, setIsRemoteOwner] = useState(false);
     const [localPlayerColor, setLocalPlayerColor] = useState("white");
     const [syncMessage, setSyncMessage] = useState("Remote: non synchronisé");
@@ -319,6 +320,7 @@ export default function App() {
     const resetToNoGame = () => {
         setIsInGame(false);
         setRemoteGameId(null);
+        setRemotePlayerIds({});
         setRemoteUpdatedAt(null);
         setIsRemoteOwner(false);
         setLocalPlayerColor("white");
@@ -336,6 +338,7 @@ export default function App() {
         initializeGame();
         setPlayMode("local");
         setRemoteGameId(null);
+        setRemotePlayerIds({});
         setRemoteUpdatedAt(null);
         setIsRemoteOwner(false);
         const localColor = firstHumanColor(controlByColor);
@@ -373,6 +376,7 @@ export default function App() {
         setControlByColor(snapshot.controlByColor);
         setPlayMode("local");
         setRemoteGameId(null);
+        setRemotePlayerIds({});
         setRemoteUpdatedAt(null);
         setIsRemoteOwner(false);
         setLocalPlayerColor(localSession.currentColor ?? firstHumanColor(snapshot.controlByColor));
@@ -439,6 +443,7 @@ export default function App() {
             }, username);
             applyGameState(initialState);
             setRemoteGameId(result.id);
+            setRemotePlayerIds(result.player_ids ?? {});
             setRemoteUpdatedAt(result.updated_at ?? null);
             setIsRemoteOwner(true);
             const localColor =
@@ -492,6 +497,7 @@ export default function App() {
             setRemoteGameId(result.id);
             const remoteGame = await fetchRemoteGame(result.id);
             const parsed = parseRemoteState(remoteGame);
+            setRemotePlayerIds(remoteGame.player_ids ?? {});
             const assignedColor =
                 result.assigned_color ??
                 colorOfPlayer(
@@ -695,6 +701,7 @@ export default function App() {
                     }
                     setPlayMode("local");
                     setRemoteGameId(null);
+                    setRemotePlayerIds({});
                     setRemoteUpdatedAt(null);
                     setIsRemoteOwner(false);
                     setLocalPlayerColor(colorFromStatus ?? "white");
@@ -721,6 +728,7 @@ export default function App() {
                 applyGameState(parsed);
                 setPlayMode(sessionMode === "remote_create" ? "create" : "join");
                 setRemoteGameId(gameId);
+                setRemotePlayerIds(remoteGame.player_ids ?? {});
                 setRemoteUpdatedAt(remoteGame.updated_at ?? null);
                 setIsRemoteOwner(Boolean(statusRow.is_owner));
                 setLocalPlayerColor(resolvedColor);
@@ -876,6 +884,7 @@ export default function App() {
 
             const parsed = parseRemoteState(remoteGame);
             applyGameState(parsed);
+            setRemotePlayerIds(remoteGame?.player_ids ?? {});
             setRemoteUpdatedAt(nextUpdatedAt);
             setSyncMessage(`Remote: mise à jour reçue (${source})`);
         };
@@ -1652,6 +1661,22 @@ export default function App() {
                                             ]}
                                         >
                                             {panel.label}
+                                        </Text>
+                                        <Text
+                                            style={[
+                                                styles.cornerSub,
+                                                { fontSize: subFontSize },
+                                            ]}
+                                        >
+                                            {playMode === "local"
+                                                ? controlByColor[panel.key] === "robot"
+                                                    ? "Robot"
+                                                    : panel.key === localPlayerColor
+                                                        ? normalizedPlayerUsername
+                                                        : "Humain"
+                                                : remotePlayerIds[panel.key] === "robot"
+                                                    ? "Robot"
+                                                    : remotePlayerIds[panel.key] ?? "Libre"}
                                         </Text>
                                         <View style={styles.cornerRow}>
                                             <Text
