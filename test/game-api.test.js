@@ -42,7 +42,7 @@ test("normalizeCreateOptions keeps additional explicit player assignments", () =
   });
 });
 
-test("normalizeCreateOptions marks robot seats as occupied", () => {
+test("normalizeCreateOptions ignores robot control hints for remote games", () => {
   const options = normalizeCreateOptions("alice", {
     controlByColor: {
       red: "robot",
@@ -56,9 +56,23 @@ test("normalizeCreateOptions marks robot seats as occupied", () => {
 
   assert.deepEqual(options.player_ids, {
     white: "alice",
-    red: "robot",
-    black: "robot",
+    red: "someone",
     blue: "eve",
+  });
+});
+
+test("normalizeCreateOptions never persists literal robot usernames", () => {
+  const options = normalizeCreateOptions("alice", {
+    playerIdsByColor: {
+      red: "robot",
+      black: "ROBOT",
+      blue: "bob",
+    },
+  });
+
+  assert.deepEqual(options.player_ids, {
+    white: "alice",
+    blue: "bob",
   });
 });
 

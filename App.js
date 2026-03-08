@@ -495,7 +495,7 @@ export default function App() {
         if (playMode !== "local" && turn !== localPlayerColor) {
             return;
         }
-        if (controlByColor[turn] === "robot") {
+        if (playMode === "local" && controlByColor[turn] === "robot") {
             return;
         }
 
@@ -713,9 +713,7 @@ export default function App() {
                 capturesBy: createCapturesBy(),
                 winner: null,
             };
-            const result = await createRemoteGame(initialState, {
-                controlByColor,
-            }, username);
+            const result = await createRemoteGame(initialState, {}, username);
             applyGameState(initialState);
             setRemoteGameId(result.id);
             setRemotePlayerIds(result.player_ids ?? {});
@@ -1108,10 +1106,12 @@ export default function App() {
     }, [playerUsername, normalizedPlayerUsername, supabaseConfigured, isInGame]);
 
     useEffect(() => {
-        if (!isInGame || winner || controlByColor[turn] !== "robot") {
-            return undefined;
-        }
-        if (playMode !== "local" && waitingPlayersMessage) {
+        if (
+            !isInGame ||
+            playMode !== "local" ||
+            winner ||
+            controlByColor[turn] !== "robot"
+        ) {
             return undefined;
         }
 
@@ -1179,7 +1179,6 @@ export default function App() {
         winner,
         controlByColor,
         playMode,
-        waitingPlayersMessage,
     ]);
 
     useEffect(() => {
@@ -1510,7 +1509,7 @@ export default function App() {
                                     </Pressable>
                                 </View>
 
-                                {playMode !== "join" ? (
+                                {playMode === "local" ? (
                                     <>
                                         <Text
                                             style={[

@@ -114,27 +114,23 @@ async function ensureAuthenticatedUserId() {
 
 export function normalizeCreateOptions(username, options = {}) {
     const rawPlayerIds = options?.playerIdsByColor ?? {};
-    const controlByColor = options?.controlByColor ?? {};
     const playerIds = {};
     const normalizedUsername = normalizeUsername(username, "player");
 
-    for (const color of PLAYER_COLORS) {
-        if (controlByColor[color] === "robot") {
-            playerIds[color] = "robot";
-        }
-    }
-
     for (const [color, candidate] of Object.entries(rawPlayerIds)) {
-        if (controlByColor[color] === "robot") {
+        if (!PLAYER_COLORS.includes(color)) {
             continue;
         }
         const trimmed = normalizeUsername(candidate, "");
+        if (trimmed === "robot") {
+            continue;
+        }
         if (trimmed) {
             playerIds[color] = trimmed;
         }
     }
 
-    if (!playerIds.white || playerIds.white === "robot") {
+    if (!playerIds.white) {
         playerIds.white = normalizedUsername;
     }
 
@@ -147,6 +143,9 @@ export async function createRemoteGame(gameState, options = {}, username = null)
     console.log(`${LOG_PREFIX} createRemoteGame:start`);
     const userId = await ensureAuthenticatedUserId();
     const createOptions = normalizeCreateOptions(username, options);
+    if (Object.values(createOptions.player_ids).some((value) => value === "robot")) {
+        throw new Error("Création remote invalide: les sièges robot sont interdits.");
+    }
     const payload = {
         ...asPayload(gameState),
         owner_id: userId,
