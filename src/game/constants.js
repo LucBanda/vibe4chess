@@ -21,7 +21,7 @@ export const PIECE_SYMBOL = {
   rook: "♜",
   bishop: "♝",
   knight: "♞",
-  pawn: "♟",
+  pawn: "♟︎",
 };
 
 export const BACK_RANK = [
