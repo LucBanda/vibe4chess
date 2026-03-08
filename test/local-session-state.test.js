@@ -29,6 +29,7 @@ test("normalizeLocalSession keeps valid in-game values", () => {
     currentGameId: "22222222-2222-4222-8222-222222222222",
     currentColor: "red",
     isOwner: true,
+    localGameState: null,
     updatedAt: "2026-03-02T08:10:00.000Z",
   });
 });
@@ -55,6 +56,7 @@ test("normalizeLocalSession sanitizes invalid values and clears in-game fields",
     currentGameId: null,
     currentColor: null,
     isOwner: false,
+    localGameState: null,
     updatedAt: "2026-03-02T09:00:00.000Z",
   });
 });
@@ -79,8 +81,55 @@ test("parseLocalSession returns normalized content", () => {
   assert.equal(parsed.currentGameId, "44444444-4444-4444-8444-444444444444");
   assert.equal(parsed.currentColor, "blue");
   assert.equal(parsed.isOwner, true);
+  assert.equal(parsed.localGameState, null);
 });
 
 test("parseLocalSession returns null for invalid JSON", () => {
   assert.equal(parseLocalSession("{not-json"), null);
+});
+
+test("normalizeLocalSession keeps local game snapshot when valid", () => {
+  const normalized = normalizeLocalSession({
+    username: "alice",
+    status: "in_game",
+    sessionMode: "local",
+    currentColor: "white",
+    localGameState: {
+      board: {
+        "4,4": { player: "white", type: "king" },
+      },
+      turn: "red",
+      moveCount: 17,
+      capturesBy: {
+        white: 2,
+        red: 1,
+      },
+      winner: null,
+      controlByColor: {
+        white: "human",
+        red: "robot",
+      },
+    },
+  });
+
+  assert.deepEqual(normalized.localGameState, {
+    board: {
+      "4,4": { player: "white", type: "king" },
+    },
+    turn: "red",
+    moveCount: 17,
+    capturesBy: {
+      white: 2,
+      red: 1,
+      black: 0,
+      blue: 0,
+    },
+    winner: null,
+    controlByColor: {
+      white: "human",
+      red: "robot",
+      black: "human",
+      blue: "human",
+    },
+  });
 });

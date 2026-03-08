@@ -17,9 +17,10 @@ import {
     PLAYER_LABEL,
     PIECE_SYMBOL,
 } from "./src/game/constants.js";
-import { createInitialBoard, keyOf } from "./src/game/board.js";
+import { createInitialBoard, isPlayable, keyOf } from "./src/game/board.js";
 import { chooseRobotMove } from "./src/game/bot.js";
 import { applyMove, createCapturesBy } from "./src/game/engine.js";
+import { isLegalMove } from "./src/game/rules.js";
 import { computeStats } from "./src/game/stats.js";
 import {
     colorOfPlayer,
@@ -44,6 +45,12 @@ import {
 } from "./src/lib/gameApi.js";
 import { normalizeUsername } from "./src/lib/username.js";
 import { getTabUsername, setTabUsername } from "./src/lib/tabUsername.js";
+import {
+    clearLocalSession,
+    loadLocalSession,
+    saveLocalSession,
+    setActiveLocalUsername,
+} from "./src/lib/localSession.js";
 
 function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
@@ -55,6 +62,7 @@ export default function App() {
     const [board, setBoard] = useState(() => createInitialBoard());
     const [turn, setTurn] = useState("white");
     const [selected, setSelected] = useState(null);
+    const [lastMove, setLastMove] = useState(null);
     const [moveCount, setMoveCount] = useState(0);
     const [capturesBy, setCapturesBy] = useState({
         ...createCapturesBy(),
@@ -69,8 +77,10 @@ export default function App() {
     const [joinableGames, setJoinableGames] = useState([]);
     const [selectedJoinGameId, setSelectedJoinGameId] = useState(null);
     const [loadingJoinableGames, setLoadingJoinableGames] = useState(false);
+    const [hasSavedLocalGame, setHasSavedLocalGame] = useState(false);
     const [remoteUpdatedAt, setRemoteUpdatedAt] = useState(null);
     const remoteUpdatedAtRef = useRef(null);
+    const hasAutoResumedLocalRef = useRef(false);
     const [controlByColor, setControlByColor] = useState({
         white: "human",
         red: "human",
@@ -80,8 +90,10 @@ export default function App() {
     const [playerUsername, setPlayerUsername] = useState(() => getTabUsername());
     const normalizedPlayerUsername = normalizeUsername(playerUsername, "player");
 
+    const isCompactLayout = width < 980;
+    const effectiveSidebarWidth = isCompactLayout ? 0 : sidebarMeasuredWidth;
     const shortSide = Math.min(width, height);
-    const stageWidth = Math.max(width - sidebarMeasuredWidth, 220);
+    const stageWidth = Math.max(width - effectiveSidebarWidth, 220);
     const scorePanelWidth = clamp(Math.floor(stageWidth * 0.18), 108, 180);
     const boardPixelSize = Math.floor(Math.min(stageWidth - 20, height - 20));
     const renderedBoardSize = Math.floor(
@@ -93,7 +105,9 @@ export default function App() {
     );
     const squareSize = Math.floor(renderedBoardSize / BOARD_SIZE);
     const boardSize = squareSize * BOARD_SIZE;
-    const menuShortSide = Math.min(Math.max(sidebarMeasuredWidth, 180), height);
+    const menuShortSide = isCompactLayout
+        ? Math.min(width, 420)
+        : Math.min(Math.max(sidebarMeasuredWidth, 180), height);
 
     const panelHorizontalPadding = clamp(Math.floor(shortSide * 0.018), 10, 18);
     const panelVerticalPadding = clamp(Math.floor(shortSide * 0.016), 8, 16);
@@ -122,6 +136,28 @@ export default function App() {
         () => createPerspectiveCells(board, localPlayerColor),
         [board, localPlayerColor],
     );
+    const legalTargets = useMemo(() => {
+        if (!selected) {
+            return new Set();
+        }
+        const piece = board[keyOf(selected.x, selected.y)];
+        if (!piece || piece.player !== turn) {
+            return new Set();
+        }
+
+        const targets = new Set();
+        for (let y = 0; y < BOARD_SIZE; y += 1) {
+            for (let x = 0; x < BOARD_SIZE; x += 1) {
+                if (!isPlayable(x, y)) {
+                    continue;
+                }
+                if (isLegalMove(board, selected.x, selected.y, x, y, piece)) {
+                    targets.add(keyOf(x, y));
+                }
+            }
+        }
+        return targets;
+    }, [board, selected, turn]);
     const stats = useMemo(
         () => computeStats(board, capturesBy),
         [board, capturesBy],
@@ -129,6 +165,7 @@ export default function App() {
     const alivePlayers = stats.filter((s) => s.alive).map((s) => s.player);
     const winner = alivePlayers.length === 1 ? alivePlayers[0] : null;
     const playerColorLabel = PLAYER_LABEL[localPlayerColor] ?? "Inconnue";
+    const canResumeLocalGame = hasSavedLocalGame && !isInGame;
 
     useEffect(() => {
         remoteUpdatedAtRef.current = remoteUpdatedAt;
@@ -184,6 +221,7 @@ export default function App() {
         if (normalized !== playerUsername) {
             setPlayerUsername(normalized);
         }
+        setActiveLocalUsername(normalized);
         return normalized;
     };
 
@@ -241,6 +279,12 @@ export default function App() {
         setCapturesBy(result.state.capturesBy);
         setTurn(result.state.turn);
         setMoveCount(result.state.moveCount);
+        setLastMove({
+            fromX: selected.x,
+            fromY: selected.y,
+            toX: x,
+            toY: y,
+        });
         setSelected(null);
         void syncLocalStateToRemote(result.state, "coup joueur");
     };
@@ -249,6 +293,7 @@ export default function App() {
         setBoard(createInitialBoard());
         setTurn("white");
         setSelected(null);
+        setLastMove(null);
         setMoveCount(0);
         setCapturesBy(createCapturesBy());
     };
@@ -258,6 +303,7 @@ export default function App() {
         setTurn(parsedState.turn);
         setMoveCount(parsedState.moveCount);
         setCapturesBy(parsedState.capturesBy);
+        setLastMove(parsedState.lastMove ?? null);
         setSelected(null);
     };
 
@@ -270,6 +316,7 @@ export default function App() {
         initializeGame();
         setSyncMessage("Aucune partie en cours");
         setSelected(null);
+        setLastMove(null);
     };
 
     const startLocalGame = async () => {
@@ -293,6 +340,36 @@ export default function App() {
             currentColor: localColor,
             isOwner: false,
         });
+    };
+
+    const resumeSavedLocalGame = async () => {
+        const username = getRequiredUsername();
+        if (!username) {
+            return;
+        }
+        const localSession = await loadLocalSession(username);
+        const snapshot = localSession?.localGameState;
+        if (
+            !localSession ||
+            localSession.status !== "in_game" ||
+            localSession.sessionMode !== "local" ||
+            !snapshot
+        ) {
+            Alert.alert("Reprise", "Aucune partie locale sauvegardée.");
+            setHasSavedLocalGame(false);
+            return;
+        }
+
+        applyGameState(snapshot);
+        setControlByColor(snapshot.controlByColor);
+        setPlayMode("local");
+        setRemoteGameId(null);
+        setRemoteUpdatedAt(null);
+        setIsRemoteOwner(false);
+        setLocalPlayerColor(localSession.currentColor ?? firstHumanColor(snapshot.controlByColor));
+        setIsInGame(true);
+        setSyncMessage(`Partie locale reprise (${username})`);
+        hasAutoResumedLocalRef.current = true;
     };
 
     const syncLocalStateToRemote = async (nextState, reason = "sync") => {
@@ -452,12 +529,22 @@ export default function App() {
     };
 
     const onQuitGame = async () => {
+        const username = normalizeUsername(playerUsername, "player");
         if (remoteGameId && isRemoteOwner) {
             try {
                 await deleteRemoteGame(remoteGameId);
             } catch (error) {
                 Alert.alert("Supabase", error.message);
                 return;
+            }
+        }
+
+        if (playMode === "local") {
+            try {
+                await clearLocalSession(username);
+                setHasSavedLocalGame(false);
+            } catch (error) {
+                console.error("Local session cleanup failed", error);
             }
         }
 
@@ -498,10 +585,58 @@ export default function App() {
 
     useEffect(() => {
         setTabUsername(normalizedPlayerUsername);
+        setActiveLocalUsername(normalizedPlayerUsername);
+        hasAutoResumedLocalRef.current = false;
     }, [normalizedPlayerUsername]);
 
     useEffect(() => {
-        if (!supabaseConfigured || isInGame) {
+        if (isInGame) {
+            return undefined;
+        }
+
+        let cancelled = false;
+
+        const loadLocalSnapshot = async () => {
+            const localSession = await loadLocalSession(normalizedPlayerUsername);
+            if (cancelled) {
+                return;
+            }
+
+            const hasSnapshot = Boolean(
+                localSession?.status === "in_game" &&
+                    localSession?.sessionMode === "local" &&
+                    localSession?.localGameState,
+            );
+            setHasSavedLocalGame(hasSnapshot);
+
+            if (!hasSnapshot || hasAutoResumedLocalRef.current) {
+                return;
+            }
+
+            const snapshot = localSession.localGameState;
+            applyGameState(snapshot);
+            setControlByColor(snapshot.controlByColor);
+            setPlayMode("local");
+            setRemoteGameId(null);
+            setRemoteUpdatedAt(null);
+            setIsRemoteOwner(false);
+            setLocalPlayerColor(
+                localSession.currentColor ?? firstHumanColor(snapshot.controlByColor),
+            );
+            setIsInGame(true);
+            setSyncMessage(`Partie locale restaurée (${normalizedPlayerUsername})`);
+            hasAutoResumedLocalRef.current = true;
+        };
+
+        void loadLocalSnapshot();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [normalizedPlayerUsername, isInGame]);
+
+    useEffect(() => {
+        if (!supabaseConfigured || isInGame || hasAutoResumedLocalRef.current) {
             return undefined;
         }
 
@@ -515,7 +650,7 @@ export default function App() {
         const applyStatus = async () => {
             try {
                 const statusRow = await fetchPlayerStatus(requestedUsername);
-                if (cancelled || !statusRow) {
+                if (cancelled || hasAutoResumedLocalRef.current || !statusRow) {
                     return;
                 }
 
@@ -541,7 +676,14 @@ export default function App() {
                 }
 
                 if (sessionMode === "local") {
-                    initializeGame();
+                    const localSession = await loadLocalSession(requestedUsername);
+                    const snapshot = localSession?.localGameState;
+                    if (snapshot) {
+                        applyGameState(snapshot);
+                        setControlByColor(snapshot.controlByColor);
+                    } else {
+                        initializeGame();
+                    }
                     setPlayMode("local");
                     setRemoteGameId(null);
                     setRemoteUpdatedAt(null);
@@ -591,6 +733,48 @@ export default function App() {
     }, [playerUsername, normalizedPlayerUsername, supabaseConfigured, isInGame]);
 
     useEffect(() => {
+        if (!isInGame || playMode !== "local") {
+            return undefined;
+        }
+
+        const persistLocalSnapshot = async () => {
+            try {
+                await saveLocalSession({
+                    username: normalizedPlayerUsername,
+                    status: "in_game",
+                    sessionMode: "local",
+                    currentColor: localPlayerColor,
+                    localGameState: {
+                        board,
+                        turn,
+                        moveCount,
+                        capturesBy,
+                        winner,
+                        controlByColor,
+                    },
+                });
+                setHasSavedLocalGame(true);
+            } catch (error) {
+                console.error("Local session persistence failed", error);
+            }
+        };
+
+        void persistLocalSnapshot();
+        return undefined;
+    }, [
+        isInGame,
+        playMode,
+        normalizedPlayerUsername,
+        localPlayerColor,
+        board,
+        turn,
+        moveCount,
+        capturesBy,
+        winner,
+        controlByColor,
+    ]);
+
+    useEffect(() => {
         if (!isInGame || winner || controlByColor[turn] !== "robot") {
             return undefined;
         }
@@ -636,6 +820,12 @@ export default function App() {
             setCapturesBy(result.state.capturesBy);
             setTurn(result.state.turn);
             setMoveCount(result.state.moveCount);
+            setLastMove({
+                fromX: botMove.fromX,
+                fromY: botMove.fromY,
+                toX: botMove.toX,
+                toY: botMove.toY,
+            });
             setSelected(null);
             void syncLocalStateToRemote(result.state, "coup robot");
             setSyncMessage(
@@ -752,7 +942,12 @@ export default function App() {
     return (
         <SafeAreaView style={styles.page}>
             <StatusBar style="light" />
-            <View style={styles.layoutRoot}>
+            <View
+                style={[
+                    styles.layoutRoot,
+                    { flexDirection: isCompactLayout ? "column" : "row" },
+                ]}
+            >
                 <View
                     onLayout={(event) => {
                         const nextWidth = Math.floor(event.nativeEvent.layout.width);
@@ -763,9 +958,14 @@ export default function App() {
                     style={[
                         styles.sidebar,
                         {
-                            maxWidth: Math.floor(width * 0.45),
+                            maxWidth: isCompactLayout
+                                ? width
+                                : Math.floor(width * 0.45),
                             padding: panelVerticalPadding,
                             gap: stageGap,
+                            borderRightWidth: isCompactLayout ? 0 : 1,
+                            borderBottomWidth: isCompactLayout ? 1 : 0,
+                            borderBottomColor: "rgba(255, 255, 255, 0.12)",
                         },
                     ]}
                 >
@@ -1106,6 +1306,35 @@ export default function App() {
                                                 5,
                                                 10,
                                             ),
+                                            opacity: canResumeLocalGame ? 1 : 0.45,
+                                        },
+                                    ]}
+                                    onPress={resumeSavedLocalGame}
+                                    disabled={!canResumeLocalGame}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.resetText,
+                                            { fontSize: buttonFontSize },
+                                        ]}
+                                    >
+                                        Reprendre partie locale
+                                    </Text>
+                                </Pressable>
+
+                                <Pressable
+                                    style={[
+                                        styles.menuButtonSecondary,
+                                        {
+                                            marginTop: lineSpacing * 2,
+                                            paddingVertical: resetButtonVerticalPadding,
+                                            paddingHorizontal:
+                                                resetButtonHorizontalPadding,
+                                            borderRadius: clamp(
+                                                Math.floor(panelRadius * 0.7),
+                                                5,
+                                                10,
+                                            ),
                                             opacity: supabaseConfigured ? 1 : 0.5,
                                         },
                                     ]}
@@ -1272,6 +1501,14 @@ export default function App() {
                                 const isSelected =
                                     selected?.x === boardX &&
                                     selected?.y === boardY;
+                                const squareKey = keyOf(boardX, boardY);
+                                const isLegalTarget = legalTargets.has(squareKey);
+                                const isLastMoveFrom =
+                                    lastMove?.fromX === boardX &&
+                                    lastMove?.fromY === boardY;
+                                const isLastMoveTo =
+                                    lastMove?.toX === boardX &&
+                                    lastMove?.toY === boardY;
                                 return (
                                     <Pressable
                                         key={`${x},${y}`}
@@ -1287,7 +1524,13 @@ export default function App() {
                                                     : "transparent",
                                                 borderColor: isSelected
                                                     ? "#f59e0b"
-                                                    : "transparent",
+                                                    : isLastMoveTo
+                                                        ? "#22c55e"
+                                                        : isLastMoveFrom
+                                                            ? "#60a5fa"
+                                                            : isLegalTarget
+                                                                ? "rgba(99, 102, 241, 0.75)"
+                                                                : "transparent",
                                             },
                                         ]}
                                         onPress={() => {

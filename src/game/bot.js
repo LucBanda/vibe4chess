@@ -18,6 +18,48 @@ function parseKey(squareKey) {
   return { x, y };
 }
 
+function canCaptureSquare(board, piece, fromX, fromY, targetX, targetY) {
+  return isLegalMove(board, fromX, fromY, targetX, targetY, piece);
+}
+
+function isSquareUnderThreat(board, owner, squareX, squareY) {
+  for (const [squareKey, piece] of Object.entries(board)) {
+    if (piece.player === owner) {
+      continue;
+    }
+    const { x, y } = parseKey(squareKey);
+    if (canCaptureSquare(board, piece, x, y, squareX, squareY)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function bestOpponentCaptureScore(board, owner) {
+  let best = 0;
+  for (const [squareKey, piece] of Object.entries(board)) {
+    if (piece.player === owner) {
+      continue;
+    }
+    const { x: fromX, y: fromY } = parseKey(squareKey);
+    for (let toY = 0; toY < BOARD_SIZE; toY += 1) {
+      for (let toX = 0; toX < BOARD_SIZE; toX += 1) {
+        if (!isPlayable(toX, toY)) {
+          continue;
+        }
+        if (!isLegalMove(board, fromX, fromY, toX, toY, piece)) {
+          continue;
+        }
+        const captured = board[keyOf(toX, toY)];
+        if (captured && captured.player === owner) {
+          best = Math.max(best, PIECE_VALUE[captured.type] ?? 0);
+        }
+      }
+    }
+  }
+  return best;
+}
+
 function scoreMove(state, piece, fromX, fromY, toX, toY) {
   const target = state.board[keyOf(toX, toY)];
   const captureScore = target ? (PIECE_VALUE[target.type] ?? 0) * 20 : 0;
@@ -30,7 +72,35 @@ function scoreMove(state, piece, fromX, fromY, toX, toY) {
     outcomeScore = 10_000;
   }
 
-  return captureScore + promotionScore + centerScore + outcomeScore;
+  if (!simulated.ok) {
+    return -10_000;
+  }
+
+  const movedPiece = simulated.state.board[keyOf(toX, toY)];
+  const movedPieceValue = PIECE_VALUE[movedPiece?.type] ?? PIECE_VALUE[piece.type] ?? 0;
+  const exposedPenalty = isSquareUnderThreat(
+    simulated.state.board,
+    state.turn,
+    toX,
+    toY,
+  )
+    ? movedPieceValue * 12
+    : 0;
+
+  const opponentCounterCapture = bestOpponentCaptureScore(
+    simulated.state.board,
+    state.turn,
+  );
+  const counterPenalty = opponentCounterCapture * 9;
+
+  return (
+    captureScore +
+    promotionScore +
+    centerScore +
+    outcomeScore -
+    exposedPenalty -
+    counterPenalty
+  );
 }
 
 export function chooseRobotMove(state) {

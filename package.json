@@ -8,13 +8,16 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "node --test"
+    "test:unit": "node --test",
+    "test:web-build": "CI=1 expo export -p web",
+    "test:expo-health": "CI=1 npx expo-doctor",
+    "test": "npm run test:unit && npm run test:web-build && npm run test:expo-health"
   },
   "dependencies": {
-    "@react-native-async-storage/async-storage": "^3.0.1",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "@supabase/supabase-js": "^2.98.0",
     "chess.js": "^1.4.0",
-    "expo": "~55.0.4",
+    "expo": "~55.0.5",
     "expo-status-bar": "~55.0.4",
     "react": "19.2.0",
     "react-dom": "19.2.0",

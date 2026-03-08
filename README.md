@@ -13,6 +13,13 @@ Puis lancez:
 - `i` pour iOS (sur macOS + Xcode)
 - `w` pour Web
 
+## Vérifications automatiques
+
+- `npm run test:unit`: tests unitaires Node
+- `npm run test:web-build`: build web Expo (détecte régressions de bundling web)
+- `npm run test:expo-health`: contrôle de compatibilité SDK/dépendances Expo
+- `npm test`: enchaîne les 3 checks ci-dessus
+
 ## Variables d'environnement
 
 1. Copiez `.env.example` vers `.env`
@@ -44,9 +51,11 @@ EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
 ## Fonctionnalités incluses
 
 - Échiquier jouable (tap pour sélectionner et déplacer)
-- Gestion des règles via `chess.js`
-- Historique des coups
-- Reset de partie locale
+- Règles 4 joueurs gérées par moteur local (`src/game/*`)
+- Aide ergonomique: cases légales mises en évidence après sélection
+- Lisibilité: dernier coup mis en évidence (départ/arrivée)
+- Reprise locale: auto-sauvegarde + restauration automatique + bouton de reprise
+- Layout adaptatif mobile/desktop
 - Création et synchronisation d'une partie distante dans Supabase (`chess_games`)
 - Mode client: créer une partie (avec options joueurs/robots) ou s'inscrire à une partie existante non pleine
-- Sélection `Humain/Robot` par couleur avec coups automatiques des robots
+- Sélection `Humain/Robot` par couleur avec bot tactique amélioré
