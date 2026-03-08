@@ -495,7 +495,7 @@ export default function App() {
         if (playMode !== "local" && turn !== localPlayerColor) {
             return;
         }
-        if (playMode === "local" && controlByColor[turn] === "robot") {
+        if (turnControlMode === "robot") {
             return;
         }
 
@@ -713,7 +713,14 @@ export default function App() {
                 capturesBy: createCapturesBy(),
                 winner: null,
             };
-            const result = await createRemoteGame(initialState, {}, username);
+            const robotSeats = PLAYERS.filter(
+                (color) => controlByColor[color] === "robot",
+            );
+            const result = await createRemoteGame(
+                initialState,
+                { robotSeats },
+                username,
+            );
             applyGameState(initialState);
             setRemoteGameId(result.id);
             setRemotePlayerIds(result.player_ids ?? {});
@@ -938,6 +945,12 @@ export default function App() {
         joinableGames.find((game) => game.id === selectedJoinGameId) ?? null;
     const selectedJoinGameFreeSeats = freeSeatsOf(selectedJoinGame?.player_ids);
     const canUseRemote = isInGame && playMode !== "local";
+    const turnControlMode =
+        playMode === "local"
+            ? controlByColor[turn]
+            : remotePlayerIds[turn] === "robot"
+                ? "robot"
+                : "human";
     const getPanelStatusLabel = (panelKey) => {
         if (playMode === "local") {
             if (controlByColor[panelKey] === "robot") {
@@ -1106,12 +1119,13 @@ export default function App() {
     }, [playerUsername, normalizedPlayerUsername, supabaseConfigured, isInGame]);
 
     useEffect(() => {
-        if (
-            !isInGame ||
-            playMode !== "local" ||
-            winner ||
-            controlByColor[turn] !== "robot"
-        ) {
+        if (!isInGame || winner || turnControlMode !== "robot") {
+            return undefined;
+        }
+        if (playMode !== "local" && !isRemoteOwner) {
+            return undefined;
+        }
+        if (playMode !== "local" && waitingPlayersMessage) {
             return undefined;
         }
 
@@ -1177,8 +1191,10 @@ export default function App() {
         moveCount,
         capturesBy,
         winner,
-        controlByColor,
         playMode,
+        turnControlMode,
+        isRemoteOwner,
+        waitingPlayersMessage,
     ]);
 
     useEffect(() => {

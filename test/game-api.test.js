@@ -42,12 +42,9 @@ test("normalizeCreateOptions keeps additional explicit player assignments", () =
   });
 });
 
-test("normalizeCreateOptions ignores robot control hints for remote games", () => {
+test("normalizeCreateOptions assigns explicit robot seats", () => {
   const options = normalizeCreateOptions("alice", {
-    controlByColor: {
-      red: "robot",
-      black: "robot",
-    },
+    robotSeats: ["red", "black"],
     playerIdsByColor: {
       red: "someone",
       blue: "eve",
@@ -56,7 +53,8 @@ test("normalizeCreateOptions ignores robot control hints for remote games", () =
 
   assert.deepEqual(options.player_ids, {
     white: "alice",
-    red: "someone",
+    red: "robot",
+    black: "robot",
     blue: "eve",
   });
 });
