@@ -13,6 +13,19 @@ Puis lancez:
 - `i` pour iOS (sur macOS + Xcode)
 - `w` pour Web
 
+### Expo Go iOS (recommande)
+
+Si Expo Go bloque ou si les ports par defaut sont deja pris:
+
+```bash
+npm run start:tunnel
+```
+
+Puis dans Expo Go iOS:
+1. mettre Expo Go a jour via App Store
+2. scanner le QR du terminal
+3. si echec, ouvrir Expo Go > Profile > Settings > Clear cache, puis rescanner
+
 ## Vérifications automatiques
 
 - `npm run test:unit`: tests unitaires Node

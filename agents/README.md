@@ -2,6 +2,9 @@
 
 ## Lancer en parallele (VS Code)
 
+Option rapide:
+- `npm run agents:start` (prepare les worktrees par role et affiche les commandes de lancement)
+
 1. Ouvre 7 fenetres VS Code (ou 7 sessions chat).
 2. Dans chaque session, colle le prompt de role correspondant:
    - `agents/meta-po.md`

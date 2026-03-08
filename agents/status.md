@@ -5,8 +5,8 @@ Owner mise a jour: meta-po
 
 ## Sprint courant
 
-- Sprint: `S1`
-- Objectif: fiabilite remote + qualite de flux multijoueur
+- Sprint: `S3`
+- Objectif: debuggage Expo Go iOS + stabilite web/dev runtime
 - WIP max: 3 stories
 
 ## Board
@@ -15,6 +15,7 @@ Owner mise a jour: meta-po
 |---|---|---|---|---|---|---|
 | P0-1 Reconnexion fiable | P0 | todo | meta-po | - | - | Prete pour refinement |
 | P0-2 Validation transitions etat | P0 | todo | meta-po | - | - | Depend de conventions etat |
+| P0-4 Debug Expo Go iOS | P0 | in_progress | meta-po/dev/test/review/sec/int/doc | dev/story-active | - | Session multi-agent active |
 | P0-3 Reprise locale fiable | P0 | done | dev/test/review/int/doc | main | - | Auto-save + auto-resume + bouton reprise |
 | P1-3 Ergonomie plateau | P1 | done | dev/test/review/int/doc | main | - | Cases legales + dernier coup + layout compact |
 | P2-3 Bot tactique | P2 | done | dev/test/review/int/doc | main | - | Penalite d exposition + contre-capture |
@@ -29,9 +30,10 @@ Statuts autorises: `todo`, `in_progress`, `blocked`, `review`, `done`.
   - handoff `dev`
   - handoff `test`
   - verdict `review`
+  - handoff `network-security`
   - handoff `integration`
   - handoff `documentation`
 
 ## Blocages
 
-- Aucun blocage enregistre.
+- P0-4: verifier version Expo Go iOS installée et mode de connexion (`lan`/`tunnel`) cote appareil.
