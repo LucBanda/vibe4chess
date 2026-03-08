@@ -1509,7 +1509,7 @@ export default function App() {
                                     </Pressable>
                                 </View>
 
-                                {playMode === "local" ? (
+                                {playMode !== "join" ? (
                                     <>
                                         <Text
                                             style={[
