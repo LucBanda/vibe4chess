@@ -2,7 +2,6 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
     Alert,
-    PanResponder,
     Pressable,
     SafeAreaView,
     StyleSheet,
@@ -46,7 +45,7 @@ import {
     upsertPlayerStatus,
 } from "./src/lib/gameApi.js";
 import { normalizeUsername } from "./src/lib/username.js";
-import { getTabUsername, setTabUsername } from "./src/lib/tabUsername.js";
+import { setTabUsername } from "./src/lib/tabUsername.js";
 import {
     clearLocalSession,
     loadLocalSession,
@@ -91,11 +90,22 @@ export default function App() {
         black: "human",
         blue: "human",
     });
-    const [playerUsername, setPlayerUsername] = useState(() => getTabUsername());
+    const [playerUsername, setPlayerUsername] = useState("");
     const [boardZoom, setBoardZoom] = useState(1);
     const [boardPan, setBoardPan] = useState({ x: 0, y: 0 });
     const boardPanRef = useRef({ x: 0, y: 0 });
-    const normalizedPlayerUsername = normalizeUsername(playerUsername, "player");
+    const boardZoomRef = useRef(1);
+    const lastBoardTapRef = useRef({ x: -1, y: -1, timestamp: 0 });
+    const touchStartRef = useRef({ x: 0, y: 0, timestamp: 0 });
+    const touchGestureRef = useRef({
+        mode: "none",
+        startDistance: 0,
+        startCenter: { x: 0, y: 0 },
+        startPan: { x: 0, y: 0 },
+        startZoom: 1,
+    });
+    const normalizedPlayerUsername = normalizeUsername(playerUsername, "");
+    const displayPlayerUsername = normalizedPlayerUsername || "—";
 
     const isCompactLayout = width < 980;
     const isSmallScreen = width < 700;
@@ -144,37 +154,29 @@ export default function App() {
     const zoomPercent = Math.round(boardZoom * 100);
     const maxBoardPan = Math.max(0, Math.floor(((boardSize * boardZoom) - boardSize) / 2));
     const clampPanValue = (value) => clamp(value, -maxBoardPan, maxBoardPan);
+    const maxPanForZoom = (zoom) =>
+        Math.max(0, Math.floor(((boardSize * zoom) - boardSize) / 2));
+    const clampPanForZoom = (value, zoom) => {
+        const maxPan = maxPanForZoom(zoom);
+        return clamp(value, -maxPan, maxPan);
+    };
+
+    const distanceBetweenTouches = (touchA, touchB) =>
+        Math.hypot(touchB.pageX - touchA.pageX, touchB.pageY - touchA.pageY);
+    const centerBetweenTouches = (touchA, touchB) => ({
+        x: (touchA.pageX + touchB.pageX) / 2,
+        y: (touchA.pageY + touchB.pageY) / 2,
+    });
+    const resetBoardCamera = () => {
+        setBoardZoom(1);
+        setBoardPan({ x: 0, y: 0 });
+    };
 
     const cells = useMemo(
         () => createPerspectiveCells(board, localPlayerColor),
         [board, localPlayerColor],
     );
 
-    const boardPanResponder = useMemo(
-        () =>
-            PanResponder.create({
-                onStartShouldSetPanResponder: () =>
-                    isSmallScreen && isInGame && boardZoom > 1,
-                onMoveShouldSetPanResponder: (_, gestureState) =>
-                    isSmallScreen &&
-                    isInGame &&
-                    boardZoom > 1 &&
-                    (Math.abs(gestureState.dx) > 2 || Math.abs(gestureState.dy) > 2),
-                onPanResponderMove: (_, gestureState) => {
-                    setBoardPan({
-                        x: clampPanValue(boardPanRef.current.x + gestureState.dx),
-                        y: clampPanValue(boardPanRef.current.y + gestureState.dy),
-                    });
-                },
-                onPanResponderRelease: () => {
-                    boardPanRef.current = boardPan;
-                },
-                onPanResponderTerminate: () => {
-                    boardPanRef.current = boardPan;
-                },
-            }),
-        [boardPan, boardZoom, isInGame, isSmallScreen, maxBoardPan],
-    );
     const legalTargets = useMemo(() => {
         if (!selected) {
             return new Set();
@@ -214,6 +216,137 @@ export default function App() {
         boardPanRef.current = boardPan;
     }, [boardPan]);
 
+    useEffect(() => {
+        boardZoomRef.current = boardZoom;
+    }, [boardZoom]);
+
+    const shouldCaptureBoardGesture = (event) => {
+        if (!isSmallScreen || !isInGame) {
+            return false;
+        }
+        const touchCount = event.nativeEvent?.touches?.length ?? 0;
+        return touchCount >= 2;
+    };
+
+    const shouldCaptureBoardPanMove = (event) => {
+        if (!isSmallScreen || !isInGame) {
+            return false;
+        }
+        const touches = event.nativeEvent?.touches ?? [];
+        if (touches.length >= 2) {
+            return true;
+        }
+        if (touches.length !== 1 || boardZoomRef.current <= 1) {
+            return false;
+        }
+        if (touchStartRef.current.timestamp === 0) {
+            return false;
+        }
+        const touch = touches[0];
+        const dx = Math.abs(touch.pageX - touchStartRef.current.x);
+        const dy = Math.abs(touch.pageY - touchStartRef.current.y);
+        return dx > 6 || dy > 6;
+    };
+
+    const onBoardGestureStart = (event) => {
+        const touches = event.nativeEvent?.touches ?? [];
+        if (touches.length === 1) {
+            touchStartRef.current = {
+                x: touches[0].pageX,
+                y: touches[0].pageY,
+                timestamp: Date.now(),
+            };
+        }
+        if (touches.length >= 2) {
+            const center = centerBetweenTouches(touches[0], touches[1]);
+            touchGestureRef.current = {
+                mode: "pinch",
+                startDistance: distanceBetweenTouches(touches[0], touches[1]),
+                startCenter: center,
+                startPan: boardPanRef.current,
+                startZoom: boardZoomRef.current,
+            };
+            return;
+        }
+        if (touches.length === 1 && boardZoomRef.current > 1) {
+            touchGestureRef.current = {
+                mode: "pan",
+                startDistance: 0,
+                startCenter: { x: touches[0].pageX, y: touches[0].pageY },
+                startPan: boardPanRef.current,
+                startZoom: boardZoomRef.current,
+            };
+        }
+    };
+
+    const onBoardGestureMove = (event) => {
+        const touches = event.nativeEvent?.touches ?? [];
+        const gesture = touchGestureRef.current;
+
+        if (touches.length >= 2) {
+            if (gesture.mode !== "pinch") {
+                const center = centerBetweenTouches(touches[0], touches[1]);
+                touchGestureRef.current = {
+                    mode: "pinch",
+                    startDistance: distanceBetweenTouches(touches[0], touches[1]),
+                    startCenter: center,
+                    startPan: boardPanRef.current,
+                    startZoom: boardZoomRef.current,
+                };
+                return;
+            }
+            const center = centerBetweenTouches(touches[0], touches[1]);
+            const distance = distanceBetweenTouches(touches[0], touches[1]);
+            const ratio =
+                gesture.startDistance > 0 ? distance / gesture.startDistance : 1;
+            const nextZoom = clamp(gesture.startZoom * ratio, 0.75, 1.8);
+            const nextPanX = clampPanForZoom(
+                gesture.startPan.x + (center.x - gesture.startCenter.x),
+                nextZoom,
+            );
+            const nextPanY = clampPanForZoom(
+                gesture.startPan.y + (center.y - gesture.startCenter.y),
+                nextZoom,
+            );
+            setBoardZoom(nextZoom);
+            setBoardPan({ x: nextPanX, y: nextPanY });
+            return;
+        }
+
+        if (touches.length === 1 && boardZoomRef.current > 1) {
+            if (gesture.mode !== "pan") {
+                touchGestureRef.current = {
+                    mode: "pan",
+                    startDistance: 0,
+                    startCenter: { x: touches[0].pageX, y: touches[0].pageY },
+                    startPan: boardPanRef.current,
+                    startZoom: boardZoomRef.current,
+                };
+                return;
+            }
+            const touch = touches[0];
+            setBoardPan({
+                x: clampPanValue(
+                    gesture.startPan.x + (touch.pageX - gesture.startCenter.x),
+                ),
+                y: clampPanValue(
+                    gesture.startPan.y + (touch.pageY - gesture.startCenter.y),
+                ),
+            });
+        }
+    };
+
+    const onBoardGestureEnd = () => {
+        touchStartRef.current = { x: 0, y: 0, timestamp: 0 };
+        touchGestureRef.current = {
+            mode: "none",
+            startDistance: 0,
+            startCenter: { x: 0, y: 0 },
+            startPan: boardPanRef.current,
+            startZoom: boardZoomRef.current,
+        };
+    };
+
     const persistPlayerPresence = async ({
         username = playerUsername,
         status = "idle",
@@ -222,7 +355,10 @@ export default function App() {
         currentColor = null,
         isOwner = false,
     } = {}) => {
-        const normalizedUsername = normalizeUsername(username, "player");
+        const normalizedUsername = normalizeUsername(username, "");
+        if (!normalizedUsername) {
+            return;
+        }
         if (!supabaseConfigured) {
             return;
         }
@@ -242,7 +378,10 @@ export default function App() {
     };
 
     const clearPlayerPresence = async () => {
-        const normalizedUsername = normalizeUsername(playerUsername, "player");
+        const normalizedUsername = normalizeUsername(playerUsername, "");
+        if (!normalizedUsername) {
+            return;
+        }
 
         if (!supabaseConfigured) {
             return;
@@ -271,6 +410,23 @@ export default function App() {
     const selectOrMove = (x, y) => {
         if (!isInGame) {
             return;
+        }
+        const zoomedOrPanned =
+            boardZoomRef.current > 1 ||
+            Math.abs(boardPanRef.current.x) > 2 ||
+            Math.abs(boardPanRef.current.y) > 2;
+        if (isSmallScreen && zoomedOrPanned) {
+            const now = Date.now();
+            const sinceLastTap = now - lastBoardTapRef.current.timestamp;
+            const closeSquare =
+                Math.abs(lastBoardTapRef.current.x - x) <= 1 &&
+                Math.abs(lastBoardTapRef.current.y - y) <= 1;
+            if (sinceLastTap > 0 && sinceLastTap < 320 && closeSquare) {
+                resetBoardCamera();
+                lastBoardTapRef.current = { x: -1, y: -1, timestamp: 0 };
+                return;
+            }
+            lastBoardTapRef.current = { x, y, timestamp: now };
         }
         if (playMode !== "local" && turn !== localPlayerColor) {
             return;
@@ -484,7 +640,7 @@ export default function App() {
             setRemoteUpdatedAt(result.updated_at ?? null);
             setIsRemoteOwner(true);
             const localColor =
-                colorOfPlayer(result.player_ids, normalizedPlayerUsername) ?? "white";
+                colorOfPlayer(result.player_ids, username) ?? "white";
             setLocalPlayerColor(localColor);
             setIsInGame(true);
             setSyncMessage(
@@ -539,7 +695,7 @@ export default function App() {
                 result.assigned_color ??
                 colorOfPlayer(
                     remoteGame.player_ids,
-                    normalizedPlayerUsername,
+                    username,
                 ) ??
                 joinColor;
             applyGameState(parsed);
@@ -581,7 +737,7 @@ export default function App() {
     };
 
     const onQuitGame = async () => {
-        const username = normalizeUsername(playerUsername, "player");
+        const username = normalizeUsername(playerUsername, "");
         if (remoteGameId && isRemoteOwner) {
             try {
                 await deleteRemoteGame(remoteGameId);
@@ -591,7 +747,7 @@ export default function App() {
             }
         }
 
-        if (playMode === "local") {
+        if (playMode === "local" && username) {
             try {
                 await clearLocalSession(username);
                 setHasSavedLocalGame(false);
@@ -666,13 +822,19 @@ export default function App() {
     const canUseRemote = isInGame && playMode !== "local";
 
     useEffect(() => {
-        setTabUsername(normalizedPlayerUsername);
-        setActiveLocalUsername(normalizedPlayerUsername);
+        setTabUsername(playerUsername);
+        if (normalizedPlayerUsername) {
+            setActiveLocalUsername(normalizedPlayerUsername);
+        }
         hasAutoResumedLocalRef.current = false;
-    }, [normalizedPlayerUsername]);
+    }, [playerUsername, normalizedPlayerUsername]);
 
     useEffect(() => {
         if (isInGame) {
+            return undefined;
+        }
+        if (!normalizedPlayerUsername) {
+            setHasSavedLocalGame(false);
             return undefined;
         }
 
@@ -818,7 +980,7 @@ export default function App() {
     }, [playerUsername, normalizedPlayerUsername, supabaseConfigured, isInGame]);
 
     useEffect(() => {
-        if (!isInGame || playMode !== "local") {
+        if (!isInGame || playMode !== "local" || !normalizedPlayerUsername) {
             return undefined;
         }
 
@@ -1193,7 +1355,7 @@ export default function App() {
                                     },
                                 ]}
                             >
-                                {normalizedPlayerUsername} | {playerColorLabel} | {moveCount} coups
+                                {displayPlayerUsername} | {playerColorLabel} | {moveCount} coups
                             </Text>
                         ) : (
                             <>
@@ -1204,9 +1366,9 @@ export default function App() {
                                             fontSize: subFontSize,
                                             marginTop: lineSpacing,
                                         },
-                                    ]}
+                                ]}
                                 >
-                                    Joueur: {normalizedPlayerUsername}
+                                    Joueur: {displayPlayerUsername}
                                 </Text>
                                 <Text
                                     style={[
@@ -1682,7 +1844,13 @@ export default function App() {
                                             ],
                                         },
                                     ]}
-                                    {...(isSmallScreen ? boardPanResponder.panHandlers : {})}
+                                    onStartShouldSetResponderCapture={shouldCaptureBoardGesture}
+                                    onMoveShouldSetResponderCapture={shouldCaptureBoardPanMove}
+                                    onResponderGrant={onBoardGestureStart}
+                                    onResponderMove={onBoardGestureMove}
+                                    onResponderTerminationRequest={() => false}
+                                    onResponderRelease={onBoardGestureEnd}
+                                    onResponderTerminate={onBoardGestureEnd}
                                 >
                                     <View
                                         style={[
@@ -1812,7 +1980,7 @@ export default function App() {
                                                         ? controlByColor[panel.key] === "robot"
                                                             ? "Robot"
                                                             : panel.key === localPlayerColor
-                                                                ? normalizedPlayerUsername
+                                                                ? displayPlayerUsername
                                                                 : "Humain"
                                                         : remotePlayerIds[panel.key] === "robot"
                                                             ? "Robot"
@@ -1899,7 +2067,7 @@ export default function App() {
                                                         ? controlByColor[panel.key] === "robot"
                                                             ? "Robot"
                                                             : panel.key === localPlayerColor
-                                                                ? normalizedPlayerUsername
+                                                                ? displayPlayerUsername
                                                                 : "Humain"
                                                         : remotePlayerIds[panel.key] === "robot"
                                                             ? "Robot"
@@ -1950,10 +2118,7 @@ export default function App() {
                                     </Pressable>
                                     <Pressable
                                         style={styles.mobileZoomValue}
-                                        onPress={() => {
-                                            setBoardZoom(1);
-                                            setBoardPan({ x: 0, y: 0 });
-                                        }}
+                                        onPress={resetBoardCamera}
                                     >
                                         <Text style={styles.mobileZoomValueText}>
                                             {zoomPercent}%
