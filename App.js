@@ -18,6 +18,15 @@ import {
     PIECE_SYMBOL,
 } from "./src/game/constants.js";
 import { createInitialBoard, isPlayable, keyOf } from "./src/game/board.js";
+import {
+    MAX_BOARD_ZOOM,
+    MIN_BOARD_ZOOM,
+    centerBetweenTouches,
+    clamp,
+    clampPanForZoom,
+    distanceBetweenTouches,
+    maxPanForZoom,
+} from "./src/game/camera.js";
 import { chooseRobotMove } from "./src/game/bot.js";
 import { applyMove, createCapturesBy } from "./src/game/engine.js";
 import { isLegalMove } from "./src/game/rules.js";
@@ -52,13 +61,6 @@ import {
     saveLocalSession,
     setActiveLocalUsername,
 } from "./src/lib/localSession.js";
-
-function clamp(value, min, max) {
-    return Math.min(max, Math.max(min, value));
-}
-
-const MIN_BOARD_ZOOM = 1;
-const MAX_BOARD_ZOOM = 1.8;
 
 export default function App() {
     const { width, height } = useWindowDimensions();
@@ -155,21 +157,8 @@ export default function App() {
     const stageGap = clamp(Math.floor(shortSide * 0.012), 6, 14);
     const useCompactInGameMenu = isSmallScreen && isInGame;
     const zoomPercent = Math.round(boardZoom * 100);
-    const maxBoardPan = Math.max(0, Math.floor(((boardSize * boardZoom) - boardSize) / 2));
-    const clampPanValue = (value) => clamp(value, -maxBoardPan, maxBoardPan);
-    const maxPanForZoom = (zoom) =>
-        Math.max(0, Math.floor(((boardSize * zoom) - boardSize) / 2));
-    const clampPanForZoom = (value, zoom) => {
-        const maxPan = maxPanForZoom(zoom);
-        return clamp(value, -maxPan, maxPan);
-    };
-
-    const distanceBetweenTouches = (touchA, touchB) =>
-        Math.hypot(touchB.pageX - touchA.pageX, touchB.pageY - touchA.pageY);
-    const centerBetweenTouches = (touchA, touchB) => ({
-        x: (touchA.pageX + touchB.pageX) / 2,
-        y: (touchA.pageY + touchB.pageY) / 2,
-    });
+    const maxBoardPan = maxPanForZoom(boardSize, boardZoom);
+    const clampPanValue = (value) => clampPanForZoom(value, boardSize, boardZoom);
     const resetBoardCamera = () => {
         setBoardZoom(1);
         setBoardPan({ x: 0, y: 0 });
@@ -309,10 +298,12 @@ export default function App() {
             );
             const nextPanX = clampPanForZoom(
                 gesture.startPan.x + (center.x - gesture.startCenter.x),
+                boardSize,
                 nextZoom,
             );
             const nextPanY = clampPanForZoom(
                 gesture.startPan.y + (center.y - gesture.startCenter.y),
+                boardSize,
                 nextZoom,
             );
             setBoardZoom(nextZoom);
