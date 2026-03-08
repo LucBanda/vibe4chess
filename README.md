@@ -67,6 +67,7 @@ EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
 - Règles 4 joueurs gérées par moteur local (`src/game/*`)
 - Aide ergonomique: cases légales mises en évidence après sélection
 - Lisibilité: dernier coup mis en évidence (départ/arrivée)
+- Mobile: zoom du plateau (`+`/`-`) + glisser du plateau quand le zoom est > 100%
 - Reprise locale: auto-sauvegarde + restauration automatique + bouton de reprise
 - Layout adaptatif mobile/desktop
 - Création et synchronisation d'une partie distante dans Supabase (`chess_games`)
