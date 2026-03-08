@@ -5,6 +5,7 @@ const LOG_PREFIX = "[supabase][gameApi]";
 const PLAYER_COLORS = ["white", "red", "black", "blue"];
 const PLAYER_STATUS = new Set(["idle", "in_game"]);
 const SESSION_MODES = new Set(["local", "remote_create", "remote_join"]);
+const REMOTE_GAME_NOT_FOUND_CODE = "REMOTE_GAME_NOT_FOUND";
 
 function asPayload(gameState) {
     if (typeof gameState?.fen === "function") {
@@ -256,13 +257,22 @@ export async function fetchRemoteGame(gameId) {
         .from("chess_games")
         .select("id, fen, pgn, turn, status, player_ids, updated_at")
         .eq("id", trimmedGameId)
-        .single();
+        .maybeSingle();
 
     if (error) {
         throw new Error(`Chargement impossible: ${error.message}`);
     }
+    if (!data) {
+        const notFoundError = new Error("Partie introuvable ou supprimée.");
+        notFoundError.code = REMOTE_GAME_NOT_FOUND_CODE;
+        throw notFoundError;
+    }
 
     return data;
+}
+
+export function isRemoteGameNotFoundError(error) {
+    return error?.code === REMOTE_GAME_NOT_FOUND_CODE;
 }
 
 export function subscribeRemoteGame(gameId, handlers = {}) {

@@ -38,6 +38,7 @@ import {
     getAuthenticatedUserId,
     joinRemoteGame,
     listJoinableGames,
+    isRemoteGameNotFoundError,
     subscribeRemoteGame,
     supabaseConfigured,
     syncRemoteGame,
@@ -889,6 +890,12 @@ export default function App() {
                 applyRemoteSnapshot(remoteGame, "fetch");
             } catch (error) {
                 if (!cancelled) {
+                    if (isRemoteGameNotFoundError(error)) {
+                        resetToNoGame();
+                        setSyncMessage("Remote: partie supprimée");
+                        void clearPlayerPresence();
+                        return;
+                    }
                     console.error("Remote pull failed", error);
                 }
             }
