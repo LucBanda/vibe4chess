@@ -32,6 +32,7 @@ import {
 import {
     clearPlayerStatus,
     createRemoteGame,
+    deleteRemoteGame,
     fetchPlayerStatus,
     fetchRemoteGame,
     getAuthenticatedUserId,
@@ -46,6 +47,7 @@ import {
 import { normalizeUsername } from "./src/lib/username.js";
 import { setTabUsername } from "./src/lib/tabUsername.js";
 import {
+    clearLocalSession,
     loadLocalSession,
     saveLocalSession,
     setActiveLocalUsername,
@@ -81,12 +83,10 @@ export default function App() {
     const [joinableGames, setJoinableGames] = useState([]);
     const [selectedJoinGameId, setSelectedJoinGameId] = useState(null);
     const [loadingJoinableGames, setLoadingJoinableGames] = useState(false);
-    const [hasSavedLocalGame, setHasSavedLocalGame] = useState(false);
     const [pendingRemoteResume, setPendingRemoteResume] = useState(null);
     const [remoteUpdatedAt, setRemoteUpdatedAt] = useState(null);
     const remoteUpdatedAtRef = useRef(null);
     const hasAutoResumedLocalRef = useRef(false);
-    const skipAutoResumeAfterQuitRef = useRef(false);
     const [controlByColor, setControlByColor] = useState({
         white: "human",
         red: "human",
@@ -209,7 +209,6 @@ export default function App() {
     const alivePlayers = stats.filter((s) => s.alive).map((s) => s.player);
     const winner = alivePlayers.length === 1 ? alivePlayers[0] : null;
     const playerColorLabel = PLAYER_LABEL[localPlayerColor] ?? "Inconnue";
-    const canResumeLocalGame = hasSavedLocalGame && !isInGame;
     const canResumeRemoteGame = Boolean(pendingRemoteResume) && !isInGame;
 
     useEffect(() => {
@@ -415,6 +414,47 @@ export default function App() {
         }
     };
 
+    const persistRemoteResumeHint = async ({
+        gameId,
+        sessionMode,
+        currentColor,
+        isOwner = false,
+    }) => {
+        const username = normalizeUsername(playerUsername, "");
+        if (!username || !gameId) {
+            return;
+        }
+        try {
+            await saveLocalSession({
+                username,
+                status: "in_game",
+                sessionMode,
+                currentGameId: gameId,
+                currentColor,
+                isOwner,
+            });
+        } catch (error) {
+            console.error("Remote resume hint save failed", error);
+        }
+    };
+
+    const clearResumeHint = async () => {
+        const username = normalizeUsername(playerUsername, "");
+        if (!username) {
+            return;
+        }
+        try {
+            await clearLocalSession(username);
+        } catch (error) {
+            console.error("Resume hint clear failed", error);
+        }
+    };
+
+    const clearRemoteResumeState = () => {
+        setPendingRemoteResume(null);
+        void clearResumeHint();
+    };
+
     const getRequiredUsername = () => {
         const normalized = normalizeUsername(playerUsername, "");
         if (!normalized) {
@@ -559,6 +599,13 @@ export default function App() {
         setLastMove(null);
     };
 
+    const handleRemoteGameDeleted = () => {
+        clearRemoteResumeState();
+        resetToNoGame();
+        setSyncMessage("Remote: partie supprimée");
+        void clearPlayerPresence();
+    };
+
     const startLocalGame = async () => {
         const username = getRequiredUsername();
         if (!username) {
@@ -585,38 +632,6 @@ export default function App() {
         });
     };
 
-    const resumeSavedLocalGame = async () => {
-        const username = getRequiredUsername();
-        if (!username) {
-            return;
-        }
-        const localSession = await loadLocalSession(username);
-        const snapshot = localSession?.localGameState;
-        if (
-            !localSession ||
-            localSession.status !== "in_game" ||
-            localSession.sessionMode !== "local" ||
-            !snapshot
-        ) {
-            Alert.alert("Reprise", "Aucune partie locale sauvegardée.");
-            setHasSavedLocalGame(false);
-            return;
-        }
-
-        applyGameState(snapshot);
-        setControlByColor(snapshot.controlByColor);
-        setPlayMode("local");
-        setRemoteGameId(null);
-        setRemotePlayerIds({});
-        setRemoteUpdatedAt(null);
-        setIsRemoteOwner(false);
-        setLocalPlayerColor(localSession.currentColor ?? firstHumanColor(snapshot.controlByColor));
-        setIsInGame(true);
-        setSyncMessage(`Partie locale reprise (${username})`);
-        setWaitingPlayersMessage(null);
-        hasAutoResumedLocalRef.current = true;
-    };
-
     const resumePendingRemoteGame = async () => {
         if (!pendingRemoteResume?.gameId) {
             Alert.alert("Reprise", "Aucune partie distante à reprendre.");
@@ -640,9 +655,19 @@ export default function App() {
             setJoinColor(pendingRemoteResume.currentColor ?? joinColor);
             setIsInGame(true);
             setSyncMessage("Partie distante reprise");
+            void persistRemoteResumeHint({
+                gameId: pendingRemoteResume.gameId,
+                sessionMode: pendingRemoteResume.sessionMode,
+                currentColor:
+                    pendingRemoteResume.currentColor ??
+                    colorOfPlayer(remoteGame.player_ids, normalizedPlayerUsername) ??
+                    "white",
+                isOwner: Boolean(pendingRemoteResume.isOwner),
+            });
         } catch (error) {
             if (isRemoteGameNotFoundError(error)) {
                 setPendingRemoteResume(null);
+                void clearResumeHint();
                 Alert.alert("Reprise", "La partie distante n'existe plus.");
                 return;
             }
@@ -725,6 +750,12 @@ export default function App() {
                 isOwner: true,
                 playerIds: result.player_ids ?? {},
             });
+            void persistRemoteResumeHint({
+                gameId: result.id,
+                sessionMode: "remote_create",
+                currentColor: localColor,
+                isOwner: true,
+            });
             void persistPlayerPresence({
                 username,
                 status: "in_game",
@@ -793,6 +824,12 @@ export default function App() {
                 isOwner: false,
                 playerIds: remoteGame.player_ids ?? {},
             });
+            void persistRemoteResumeHint({
+                gameId: result.id,
+                sessionMode: "remote_join",
+                currentColor: assignedColor,
+                isOwner: false,
+            });
             void persistPlayerPresence({
                 username,
                 status: "in_game",
@@ -823,16 +860,34 @@ export default function App() {
     };
 
     const onQuitGame = async () => {
-        if (playMode === "local") {
-            skipAutoResumeAfterQuitRef.current = true;
+        const isRemoteSession = playMode !== "local" && Boolean(remoteGameId);
+        if (isRemoteSession && isRemoteOwner && remoteGameId) {
+            try {
+                await deleteRemoteGame(remoteGameId);
+            } catch (error) {
+                Alert.alert("Supabase", error.message);
+                return;
+            }
+            handleRemoteGameDeleted();
+            return;
         }
-        if (playMode !== "local" && remoteGameId) {
+
+        if (playMode === "local") {
+            clearRemoteResumeState();
+        }
+        if (isRemoteSession && remoteGameId) {
             setPendingRemoteResume({
                 gameId: remoteGameId,
                 sessionMode: playMode === "create" ? "remote_create" : "remote_join",
                 currentColor: localPlayerColor,
                 isOwner: isRemoteOwner,
                 playerIds: remotePlayerIds,
+            });
+            void persistRemoteResumeHint({
+                gameId: remoteGameId,
+                sessionMode: playMode === "create" ? "remote_create" : "remote_join",
+                currentColor: localPlayerColor,
+                isOwner: isRemoteOwner,
             });
         }
 
@@ -950,49 +1005,40 @@ export default function App() {
             return undefined;
         }
         if (!normalizedPlayerUsername) {
-            setHasSavedLocalGame(false);
+            setPendingRemoteResume(null);
             return undefined;
         }
 
         let cancelled = false;
 
-        const loadLocalSnapshot = async () => {
+        const loadResumeHint = async () => {
             const localSession = await loadLocalSession(normalizedPlayerUsername);
             if (cancelled) {
                 return;
             }
 
-            const hasSnapshot = Boolean(
+            const canResumeRemote = Boolean(
                 localSession?.status === "in_game" &&
-                    localSession?.sessionMode === "local" &&
-                    localSession?.localGameState,
+                    (localSession?.sessionMode === "remote_create" ||
+                        localSession?.sessionMode === "remote_join") &&
+                    localSession?.currentGameId,
             );
-            setHasSavedLocalGame(hasSnapshot);
-
-            if (!hasSnapshot || hasAutoResumedLocalRef.current) {
+            if (!canResumeRemote) {
+                setPendingRemoteResume(null);
                 return;
             }
-            if (skipAutoResumeAfterQuitRef.current) {
-                skipAutoResumeAfterQuitRef.current = false;
-                return;
-            }
-
-            const snapshot = localSession.localGameState;
-            applyGameState(snapshot);
-            setControlByColor(snapshot.controlByColor);
-            setPlayMode("local");
-            setRemoteGameId(null);
-            setRemoteUpdatedAt(null);
-            setIsRemoteOwner(false);
-            setLocalPlayerColor(
-                localSession.currentColor ?? firstHumanColor(snapshot.controlByColor),
-            );
-            setIsInGame(true);
-            setSyncMessage(`Partie locale restaurée (${normalizedPlayerUsername})`);
-            hasAutoResumedLocalRef.current = true;
+            setPendingRemoteResume({
+                gameId: localSession.currentGameId,
+                sessionMode: localSession.sessionMode,
+                currentColor: localSession.currentColor,
+                isOwner: Boolean(localSession.isOwner),
+                playerIds: {},
+            });
+            setPlayMode(localSession.sessionMode === "remote_create" ? "create" : "join");
+            setSyncMessage(`Partie distante prête à reprendre (${normalizedPlayerUsername})`);
         };
 
-        void loadLocalSnapshot();
+        void loadResumeHint();
 
         return () => {
             cancelled = true;
@@ -1040,23 +1086,9 @@ export default function App() {
                 }
 
                 if (sessionMode === "local") {
-                    const localSession = await loadLocalSession(requestedUsername);
-                    const snapshot = localSession?.localGameState;
-                    if (snapshot) {
-                        applyGameState(snapshot);
-                        setControlByColor(snapshot.controlByColor);
-                    } else {
-                        initializeGame();
-                    }
+                    setPendingRemoteResume(null);
                     setPlayMode("local");
-                    setRemoteGameId(null);
-                    setRemotePlayerIds({});
-                    setRemoteUpdatedAt(null);
-                    setIsRemoteOwner(false);
-                    setLocalPlayerColor(colorFromStatus ?? "white");
-                    setIsInGame(true);
-                    setSyncMessage(`Partie locale restaurée (${requestedUsername})`);
-                    setWaitingPlayersMessage(null);
+                    setSyncMessage(`Session locale détectée (${requestedUsername})`);
                     return;
                 }
 
@@ -1089,48 +1121,6 @@ export default function App() {
             cancelled = true;
         };
     }, [playerUsername, normalizedPlayerUsername, supabaseConfigured, isInGame]);
-
-    useEffect(() => {
-        if (!isInGame || playMode !== "local" || !normalizedPlayerUsername) {
-            return undefined;
-        }
-
-        const persistLocalSnapshot = async () => {
-            try {
-                await saveLocalSession({
-                    username: normalizedPlayerUsername,
-                    status: "in_game",
-                    sessionMode: "local",
-                    currentColor: localPlayerColor,
-                    localGameState: {
-                        board,
-                        turn,
-                        moveCount,
-                        capturesBy,
-                        winner,
-                        controlByColor,
-                    },
-                });
-                setHasSavedLocalGame(true);
-            } catch (error) {
-                console.error("Local session persistence failed", error);
-            }
-        };
-
-        void persistLocalSnapshot();
-        return undefined;
-    }, [
-        isInGame,
-        playMode,
-        normalizedPlayerUsername,
-        localPlayerColor,
-        board,
-        turn,
-        moveCount,
-        capturesBy,
-        winner,
-        controlByColor,
-    ]);
 
     useEffect(() => {
         if (!isInGame || winner || controlByColor[turn] !== "robot") {
@@ -1248,9 +1238,7 @@ export default function App() {
             } catch (error) {
                 if (!cancelled) {
                     if (isRemoteGameNotFoundError(error)) {
-                        resetToNoGame();
-                        setSyncMessage("Remote: partie supprimée");
-                        void clearPlayerPresence();
+                        handleRemoteGameDeleted();
                         return;
                     }
                     console.error("Remote pull failed", error);
@@ -1285,9 +1273,7 @@ export default function App() {
                     }
 
                     if (eventType === "DELETE") {
-                        resetToNoGame();
-                        setSyncMessage("Remote: partie supprimée");
-                        void clearPlayerPresence();
+                        handleRemoteGameDeleted();
                         return;
                     }
 
@@ -1703,37 +1689,6 @@ export default function App() {
                                         </View>
                                     </>
                                 )}
-
-                                <Pressable
-                                    style={[
-                                        styles.menuButtonSecondary,
-                                        {
-                                            marginTop: lineSpacing * 2,
-                                            paddingVertical: resetButtonVerticalPadding,
-                                            paddingHorizontal:
-                                                resetButtonHorizontalPadding,
-                                            borderRadius: clamp(
-                                                Math.floor(panelRadius * 0.7),
-                                                5,
-                                                10,
-                                            ),
-                                            opacity: canResumeLocalGame ? 1 : 0.45,
-                                        },
-                                    ]}
-                                    onPress={resumeSavedLocalGame}
-                                    disabled={!canResumeLocalGame}
-                                >
-                                        <Text
-                                            style={[
-                                                styles.resetText,
-                                                { fontSize: buttonFontSize },
-                                            ]}
-                                        >
-                                        {isSmallScreen
-                                            ? "↺ Reprendre locale"
-                                            : "Reprendre partie locale"}
-                                    </Text>
-                                </Pressable>
 
                                 <Pressable
                                     style={[
