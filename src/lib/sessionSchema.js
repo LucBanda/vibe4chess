@@ -38,3 +38,7 @@ export function normalizeControlByColor(raw) {
   }
   return controlByColor;
 }
+
+export function createDefaultControlByColor() {
+  return normalizeControlByColor();
+}

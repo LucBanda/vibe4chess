@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  createDefaultControlByColor,
   normalizeCapturesBy,
   normalizeControlByColor,
   normalizeMoveCount,
@@ -38,6 +39,20 @@ test("normalizeControlByColor defaults to human for unsupported values", () => {
       blue: "human",
     },
   );
+});
+
+test("createDefaultControlByColor returns all-human independent maps", () => {
+  const a = createDefaultControlByColor();
+  const b = createDefaultControlByColor();
+
+  assert.deepEqual(a, {
+    white: "human",
+    red: "human",
+    black: "human",
+    blue: "human",
+  });
+  a.white = "robot";
+  assert.equal(b.white, "human");
 });
 
 test("normalize enum helpers keep allowed values and fallback otherwise", () => {

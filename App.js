@@ -62,6 +62,7 @@ import {
     saveLocalSession,
     setActiveLocalUsername,
 } from "./src/lib/localSession.js";
+import { createDefaultControlByColor } from "./src/lib/sessionSchema.js";
 
 export default function App() {
     const { width, height } = useWindowDimensions();
@@ -90,12 +91,9 @@ export default function App() {
     const [remoteUpdatedAt, setRemoteUpdatedAt] = useState(null);
     const remoteUpdatedAtRef = useRef(null);
     const hasAutoResumedLocalRef = useRef(false);
-    const [controlByColor, setControlByColor] = useState({
-        white: "human",
-        red: "human",
-        black: "human",
-        blue: "human",
-    });
+    const [controlByColor, setControlByColor] = useState(() =>
+        createDefaultControlByColor(),
+    );
     const [playerUsername, setPlayerUsername] = useState("");
     const [boardZoom, setBoardZoom] = useState(1);
     const [boardPan, setBoardPan] = useState({ x: 0, y: 0 });
