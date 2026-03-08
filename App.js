@@ -1498,191 +1498,213 @@ export default function App() {
                         { paddingHorizontal: stageGap, paddingVertical: 0 },
                     ]}
                 >
-                    <View style={styles.boardLayer}>
+                    {isInGame ? (
+                        <>
+                            <View style={styles.boardLayer}>
+                                <View
+                                    style={[
+                                        styles.board,
+                                        {
+                                            width: boardSize,
+                                            height: boardSize,
+                                        },
+                                    ]}
+                                >
+                                    {cells.map(
+                                        ({
+                                            x,
+                                            y,
+                                            boardX,
+                                            boardY,
+                                            playable,
+                                            piece,
+                                            isLight,
+                                        }) => {
+                                            const isSelected =
+                                                selected?.x === boardX &&
+                                                selected?.y === boardY;
+                                            const squareKey = keyOf(boardX, boardY);
+                                            const isLegalTarget = legalTargets.has(squareKey);
+                                            const isLastMoveFrom =
+                                                lastMove?.fromX === boardX &&
+                                                lastMove?.fromY === boardY;
+                                            const isLastMoveTo =
+                                                lastMove?.toX === boardX &&
+                                                lastMove?.toY === boardY;
+                                            return (
+                                                <Pressable
+                                                    key={`${x},${y}`}
+                                                    style={[
+                                                        styles.square,
+                                                        {
+                                                            width: squareSize,
+                                                            height: squareSize,
+                                                            backgroundColor: playable
+                                                                ? isLight
+                                                                    ? "#f4e4c8"
+                                                                    : "#946e4d"
+                                                                : "transparent",
+                                                            borderColor: isSelected
+                                                                ? "#f59e0b"
+                                                                : isLastMoveTo
+                                                                    ? "#22c55e"
+                                                                    : isLastMoveFrom
+                                                                        ? "#60a5fa"
+                                                                        : isLegalTarget
+                                                                            ? "rgba(99, 102, 241, 0.75)"
+                                                                            : "transparent",
+                                                        },
+                                                    ]}
+                                                    onPress={() => {
+                                                        if (playable) {
+                                                            selectOrMove(boardX, boardY);
+                                                        }
+                                                    }}
+                                                >
+                                                    {piece ? (
+                                                        <Text
+                                                            style={[
+                                                                styles.piece,
+                                                                {
+                                                                    color: PLAYER_COLOR[
+                                                                        piece.player
+                                                                    ],
+                                                                    fontSize: pieceFontSize,
+                                                                    textShadowColor:
+                                                                        "rgba(0, 0, 0, 0.65)",
+                                                                    textShadowOffset: {
+                                                                        width: 0,
+                                                                        height: 1,
+                                                                    },
+                                                                    textShadowRadius: 2,
+                                                                },
+                                                            ]}
+                                                        >
+                                                            {symbolForPiece(piece)}
+                                                        </Text>
+                                                    ) : null}
+                                                </Pressable>
+                                            );
+                                        },
+                                    )}
+                                </View>
+                            </View>
+
+                            {[
+                                {
+                                    key: "black",
+                                    label: "Noir",
+                                    stats: blackStats,
+                                    top: stageGap,
+                                    left: stageGap,
+                                },
+                                {
+                                    key: "white",
+                                    label: "Blanc",
+                                    stats: whiteStats,
+                                    top: stageGap,
+                                    right: stageGap,
+                                },
+                                {
+                                    key: "red",
+                                    label: "Rouge",
+                                    stats: redStats,
+                                    bottom: stageGap,
+                                    left: stageGap,
+                                },
+                                {
+                                    key: "blue",
+                                    label: "Bleu",
+                                    stats: blueStats,
+                                    bottom: stageGap,
+                                    right: stageGap,
+                                },
+                            ].map((panel) => (
+                                <View
+                                    key={panel.key}
+                                    style={[
+                                        styles.cornerPanel,
+                                        styles.cornerOverlayPanel,
+                                        {
+                                            width: scorePanelWidth,
+                                            borderRadius: panelRadius,
+                                            paddingHorizontal: panelHorizontalPadding,
+                                            paddingVertical: panelVerticalPadding,
+                                            top: panel.top,
+                                            right: panel.right,
+                                            bottom: panel.bottom,
+                                            left: panel.left,
+                                        },
+                                    ]}
+                                >
+                                    <View style={styles.cornerTextStack}>
+                                        <Text
+                                            style={[
+                                                styles.cornerTitle,
+                                                { fontSize: titleFontSize },
+                                            ]}
+                                        >
+                                            {panel.label}
+                                        </Text>
+                                        <View style={styles.cornerRow}>
+                                            <Text
+                                                style={[
+                                                    styles.cornerSub,
+                                                    { fontSize: subFontSize },
+                                                ]}
+                                            >
+                                                Pièces
+                                            </Text>
+                                            <Text
+                                                style={[
+                                                    styles.cornerSub,
+                                                    { fontSize: subFontSize },
+                                                ]}
+                                            >
+                                                {panel.stats?.pieces ?? 0}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.cornerRow}>
+                                            <Text
+                                                style={[
+                                                    styles.cornerSub,
+                                                    { fontSize: subFontSize },
+                                                ]}
+                                            >
+                                                Prises
+                                            </Text>
+                                            <Text
+                                                style={[
+                                                    styles.cornerSub,
+                                                    { fontSize: subFontSize },
+                                                ]}
+                                            >
+                                                {panel.stats?.captures ?? 0}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                </View>
+                            ))}
+                        </>
+                    ) : (
                         <View
                             style={[
-                                styles.board,
+                                styles.boardIdleState,
                                 {
                                     width: boardSize,
                                     height: boardSize,
-                                },
-                            ]}
-                        >
-                            {cells.map(
-                                ({
-                                    x,
-                                    y,
-                                    boardX,
-                                    boardY,
-                                    playable,
-                                    piece,
-                                    isLight,
-                                }) => {
-                                const isSelected =
-                                    selected?.x === boardX &&
-                                    selected?.y === boardY;
-                                const squareKey = keyOf(boardX, boardY);
-                                const isLegalTarget = legalTargets.has(squareKey);
-                                const isLastMoveFrom =
-                                    lastMove?.fromX === boardX &&
-                                    lastMove?.fromY === boardY;
-                                const isLastMoveTo =
-                                    lastMove?.toX === boardX &&
-                                    lastMove?.toY === boardY;
-                                return (
-                                    <Pressable
-                                        key={`${x},${y}`}
-                                        style={[
-                                            styles.square,
-                                            {
-                                                width: squareSize,
-                                                height: squareSize,
-                                                backgroundColor: playable
-                                                    ? isLight
-                                                        ? "#f4e4c8"
-                                                        : "#946e4d"
-                                                    : "transparent",
-                                                borderColor: isSelected
-                                                    ? "#f59e0b"
-                                                    : isLastMoveTo
-                                                        ? "#22c55e"
-                                                        : isLastMoveFrom
-                                                            ? "#60a5fa"
-                                                            : isLegalTarget
-                                                                ? "rgba(99, 102, 241, 0.75)"
-                                                                : "transparent",
-                                            },
-                                        ]}
-                                        onPress={() => {
-                                            if (playable) {
-                                                selectOrMove(boardX, boardY);
-                                            }
-                                        }}
-                                    >
-                                        {piece ? (
-                                            <Text
-                                                style={[
-                                                    styles.piece,
-                                                    {
-                                                        color: PLAYER_COLOR[
-                                                            piece.player
-                                                        ],
-                                                        fontSize: pieceFontSize,
-                                                        textShadowColor:
-                                                            "rgba(0, 0, 0, 0.65)",
-                                                        textShadowOffset: {
-                                                            width: 0,
-                                                            height: 1,
-                                                        },
-                                                        textShadowRadius: 2,
-                                                    },
-                                                ]}
-                                            >
-                                                {symbolForPiece(piece)}
-                                            </Text>
-                                        ) : null}
-                                    </Pressable>
-                                );
-                                },
-                            )}
-                        </View>
-                    </View>
-
-                    {[
-                        {
-                            key: "black",
-                            label: "Noir",
-                            stats: blackStats,
-                            top: stageGap,
-                            left: stageGap,
-                        },
-                        {
-                            key: "white",
-                            label: "Blanc",
-                            stats: whiteStats,
-                            top: stageGap,
-                            right: stageGap,
-                        },
-                        {
-                            key: "red",
-                            label: "Rouge",
-                            stats: redStats,
-                            bottom: stageGap,
-                            left: stageGap,
-                        },
-                        {
-                            key: "blue",
-                            label: "Bleu",
-                            stats: blueStats,
-                            bottom: stageGap,
-                            right: stageGap,
-                        },
-                    ].map((panel) => (
-                        <View
-                            key={panel.key}
-                            style={[
-                                styles.cornerPanel,
-                                styles.cornerOverlayPanel,
-                                {
-                                    width: scorePanelWidth,
                                     borderRadius: panelRadius,
-                                    paddingHorizontal: panelHorizontalPadding,
-                                    paddingVertical: panelVerticalPadding,
-                                    top: panel.top,
-                                    right: panel.right,
-                                    bottom: panel.bottom,
-                                    left: panel.left,
                                 },
                             ]}
                         >
-                            <View style={styles.cornerTextStack}>
-                                <Text
-                                    style={[
-                                        styles.cornerTitle,
-                                        { fontSize: titleFontSize },
-                                    ]}
-                                >
-                                    {panel.label}
-                                </Text>
-                                <View style={styles.cornerRow}>
-                                    <Text
-                                        style={[
-                                            styles.cornerSub,
-                                            { fontSize: subFontSize },
-                                        ]}
-                                    >
-                                        Pièces
-                                    </Text>
-                                    <Text
-                                        style={[
-                                            styles.cornerSub,
-                                            { fontSize: subFontSize },
-                                        ]}
-                                    >
-                                        {panel.stats?.pieces ?? 0}
-                                    </Text>
-                                </View>
-                                <View style={styles.cornerRow}>
-                                    <Text
-                                        style={[
-                                            styles.cornerSub,
-                                            { fontSize: subFontSize },
-                                        ]}
-                                    >
-                                        Prises
-                                    </Text>
-                                    <Text
-                                        style={[
-                                            styles.cornerSub,
-                                            { fontSize: subFontSize },
-                                        ]}
-                                    >
-                                        {panel.stats?.captures ?? 0}
-                                    </Text>
-                                </View>
-                            </View>
+                            <Text style={[styles.boardIdleTitle, { fontSize: valueFontSize }]}>
+                                Aucune partie en cours
+                            </Text>
+                            <Text style={[styles.boardIdleSub, { fontSize: subFontSize }]}>
+                                Lance une partie depuis le menu pour afficher l echiquier.
+                            </Text>
                         </View>
-                    ))}
+                    )}
                 </View>
             </View>
         </SafeAreaView>
@@ -1718,6 +1740,25 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: "center",
         justifyContent: "center",
+    },
+    boardIdleState: {
+        alignSelf: "center",
+        alignItems: "center",
+        justifyContent: "center",
+        paddingHorizontal: 24,
+        backgroundColor: "rgba(15, 23, 42, 0.62)",
+        borderWidth: 1,
+        borderColor: "rgba(148, 163, 184, 0.3)",
+    },
+    boardIdleTitle: {
+        color: "#f8fafc",
+        fontWeight: "700",
+        textAlign: "center",
+    },
+    boardIdleSub: {
+        marginTop: 8,
+        color: "#cbd5e1",
+        textAlign: "center",
     },
     cornerPanel: {
         flex: 1,
