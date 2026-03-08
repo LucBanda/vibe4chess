@@ -57,6 +57,9 @@ function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
 }
 
+const MIN_BOARD_ZOOM = 1;
+const MAX_BOARD_ZOOM = 1.8;
+
 export default function App() {
     const { width, height } = useWindowDimensions();
     const [sidebarMeasuredWidth, setSidebarMeasuredWidth] = useState(0);
@@ -299,7 +302,11 @@ export default function App() {
             const distance = distanceBetweenTouches(touches[0], touches[1]);
             const ratio =
                 gesture.startDistance > 0 ? distance / gesture.startDistance : 1;
-            const nextZoom = clamp(gesture.startZoom * ratio, 0.75, 1.8);
+            const nextZoom = clamp(
+                gesture.startZoom * ratio,
+                MIN_BOARD_ZOOM,
+                MAX_BOARD_ZOOM,
+            );
             const nextPanX = clampPanForZoom(
                 gesture.startPan.x + (center.x - gesture.startCenter.x),
                 nextZoom,
@@ -344,6 +351,19 @@ export default function App() {
             startCenter: { x: 0, y: 0 },
             startPan: boardPanRef.current,
             startZoom: boardZoomRef.current,
+        };
+    };
+
+    const onBoardTouchStart = (event) => {
+        const touches = event.nativeEvent?.touches ?? [];
+        if (touches.length !== 1) {
+            touchStartRef.current = { x: 0, y: 0, timestamp: 0 };
+            return;
+        }
+        touchStartRef.current = {
+            x: touches[0].pageX,
+            y: touches[0].pageY,
+            timestamp: Date.now(),
         };
     };
 
@@ -820,6 +840,37 @@ export default function App() {
         joinableGames.find((game) => game.id === selectedJoinGameId) ?? null;
     const selectedJoinGameFreeSeats = freeSeatsOf(selectedJoinGame?.player_ids);
     const canUseRemote = isInGame && playMode !== "local";
+    const getPanelStatusLabel = (panelKey) => {
+        if (playMode === "local") {
+            if (controlByColor[panelKey] === "robot") {
+                return "Robot";
+            }
+            return panelKey === localPlayerColor ? displayPlayerUsername : "Humain";
+        }
+        if (remotePlayerIds[panelKey] === "robot") {
+            return "Robot";
+        }
+        return remotePlayerIds[panelKey] ?? "Libre";
+    };
+    const getPanelStatusTone = (panelKey) => {
+        const label = getPanelStatusLabel(panelKey);
+        if (winner && winner === panelKey) {
+            return "#f59e0b";
+        }
+        if (!winner && turn === panelKey) {
+            return "#22c55e";
+        }
+        if (label === "Libre") {
+            return "#64748b";
+        }
+        if (panelKey === "black") {
+            return "#cbd5e1";
+        }
+        if (panelKey === "white") {
+            return "#f8fafc";
+        }
+        return PLAYER_COLOR[panelKey] ?? "#60a5fa";
+    };
 
     useEffect(() => {
         setTabUsername(playerUsername);
@@ -1332,68 +1383,72 @@ export default function App() {
                         >
                             Menu
                         </Text>
-                        <Text
-                            style={[
-                                styles.cornerValue,
-                                {
-                                    fontSize: valueFontSize,
-                                    marginTop: lineSpacing,
-                                },
-                            ]}
-                        >
-                            {winner
-                                ? `Gagnant: ${PLAYER_LABEL[winner]}`
-                                : PLAYER_LABEL[turn]}
-                        </Text>
-                        {useCompactInGameMenu ? (
-                            <Text
-                                style={[
-                                    styles.cornerSub,
-                                    {
-                                        fontSize: subFontSize,
-                                        marginTop: lineSpacing,
-                                    },
-                                ]}
-                            >
-                                {displayPlayerUsername} | {playerColorLabel} | {moveCount} coups
-                            </Text>
-                        ) : (
+                        {!isInGame ? (
                             <>
                                 <Text
                                     style={[
-                                        styles.cornerSub,
+                                        styles.cornerValue,
                                         {
-                                            fontSize: subFontSize,
-                                            marginTop: lineSpacing,
-                                        },
-                                ]}
-                                >
-                                    Joueur: {displayPlayerUsername}
-                                </Text>
-                                <Text
-                                    style={[
-                                        styles.cornerSub,
-                                        {
-                                            fontSize: subFontSize,
+                                            fontSize: valueFontSize,
                                             marginTop: lineSpacing,
                                         },
                                     ]}
                                 >
-                                    Ma couleur: {playerColorLabel}
+                                    {winner
+                                        ? `Gagnant: ${PLAYER_LABEL[winner]}`
+                                        : PLAYER_LABEL[turn]}
                                 </Text>
-                                <Text
-                                    style={[
-                                        styles.cornerSub,
-                                        {
-                                            fontSize: subFontSize,
-                                            marginTop: lineSpacing,
-                                        },
-                                    ]}
-                                >
-                                    Coups: {moveCount}
-                                </Text>
+                                {useCompactInGameMenu ? (
+                                    <Text
+                                        style={[
+                                            styles.cornerSub,
+                                            {
+                                                fontSize: subFontSize,
+                                                marginTop: lineSpacing,
+                                            },
+                                        ]}
+                                    >
+                                        {displayPlayerUsername} | {playerColorLabel} | {moveCount} coups
+                                    </Text>
+                                ) : (
+                                    <>
+                                        <Text
+                                            style={[
+                                                styles.cornerSub,
+                                                {
+                                                    fontSize: subFontSize,
+                                                    marginTop: lineSpacing,
+                                                },
+                                            ]}
+                                        >
+                                            Joueur: {displayPlayerUsername}
+                                        </Text>
+                                        <Text
+                                            style={[
+                                                styles.cornerSub,
+                                                {
+                                                    fontSize: subFontSize,
+                                                    marginTop: lineSpacing,
+                                                },
+                                            ]}
+                                        >
+                                            Ma couleur: {playerColorLabel}
+                                        </Text>
+                                        <Text
+                                            style={[
+                                                styles.cornerSub,
+                                                {
+                                                    fontSize: subFontSize,
+                                                    marginTop: lineSpacing,
+                                                },
+                                            ]}
+                                        >
+                                            Coups: {moveCount}
+                                        </Text>
+                                    </>
+                                )}
                             </>
-                        )}
+                        ) : null}
                         {!isInGame ? (
                             <>
                                 <Text
@@ -1751,9 +1806,6 @@ export default function App() {
                                         },
                                     ]}
                                 >
-                                    <Text style={[styles.cornerSub, { fontSize: subFontSize }]}>
-                                        {syncMessage}
-                                    </Text>
                                     <View style={styles.visibilityRow}>
                                         {canUseRemote ? (
                                             <Pressable
@@ -1779,30 +1831,7 @@ export default function App() {
                                             <Text style={styles.resetText}>⏹ Quitter</Text>
                                         </Pressable>
                                     </View>
-                                    {waitingPlayersMessage ? (
-                                        <Text
-                                            style={[
-                                                styles.cornerSub,
-                                                { fontSize: subFontSize, color: "#fbbf24" },
-                                            ]}
-                                        >
-                                            {waitingPlayersMessage}
-                                        </Text>
-                                    ) : null}
                                 </View>
-                                {!useCompactInGameMenu ? (
-                                    <Text
-                                        style={[
-                                            styles.cornerSub,
-                                            {
-                                                fontSize: subFontSize,
-                                                marginTop: lineSpacing,
-                                            },
-                                        ]}
-                                    >
-                                        Game ID: {remoteGameId ?? "aucun"}
-                                    </Text>
-                                ) : null}
                             </>
                         )}
                         {!supabaseConfigured ? (
@@ -1846,6 +1875,7 @@ export default function App() {
                                     ]}
                                     onStartShouldSetResponderCapture={shouldCaptureBoardGesture}
                                     onMoveShouldSetResponderCapture={shouldCaptureBoardPanMove}
+                                    onTouchStart={onBoardTouchStart}
                                     onResponderGrant={onBoardGestureStart}
                                     onResponderMove={onBoardGestureMove}
                                     onResponderTerminationRequest={() => false}
@@ -1970,22 +2000,24 @@ export default function App() {
                                                 >
                                                     {panel.label}
                                                 </Text>
-                                                <Text
+                                                <View
                                                     style={[
-                                                        styles.cornerSub,
-                                                        { fontSize: subFontSize },
+                                                        styles.playerStatusBadge,
+                                                        {
+                                                            borderColor: getPanelStatusTone(panel.key),
+                                                            backgroundColor: "rgba(15, 23, 42, 0.82)",
+                                                        },
                                                     ]}
                                                 >
-                                                    {playMode === "local"
-                                                        ? controlByColor[panel.key] === "robot"
-                                                            ? "Robot"
-                                                            : panel.key === localPlayerColor
-                                                                ? displayPlayerUsername
-                                                                : "Humain"
-                                                        : remotePlayerIds[panel.key] === "robot"
-                                                            ? "Robot"
-                                                            : remotePlayerIds[panel.key] ?? "Libre"}
-                                                </Text>
+                                                    <Text
+                                                        style={[
+                                                            styles.cornerSub,
+                                                            { fontSize: subFontSize },
+                                                        ]}
+                                                    >
+                                                        {getPanelStatusLabel(panel.key)}
+                                                    </Text>
+                                                </View>
                                                 <View style={styles.cornerRow}>
                                                     <Text
                                                         style={[
@@ -2057,22 +2089,24 @@ export default function App() {
                                                 >
                                                     {panel.label}
                                                 </Text>
-                                                <Text
+                                                <View
                                                     style={[
-                                                        styles.cornerSub,
-                                                        { fontSize: subFontSize },
+                                                        styles.playerStatusBadge,
+                                                        {
+                                                            borderColor: getPanelStatusTone(panel.key),
+                                                            backgroundColor: "rgba(15, 23, 42, 0.82)",
+                                                        },
                                                     ]}
                                                 >
-                                                    {playMode === "local"
-                                                        ? controlByColor[panel.key] === "robot"
-                                                            ? "Robot"
-                                                            : panel.key === localPlayerColor
-                                                                ? displayPlayerUsername
-                                                                : "Humain"
-                                                        : remotePlayerIds[panel.key] === "robot"
-                                                            ? "Robot"
-                                                            : remotePlayerIds[panel.key] ?? "Libre"}
-                                                </Text>
+                                                    <Text
+                                                        style={[
+                                                            styles.cornerSub,
+                                                            { fontSize: subFontSize },
+                                                        ]}
+                                                    >
+                                                        {getPanelStatusLabel(panel.key)}
+                                                    </Text>
+                                                </View>
                                                 <View style={styles.cornerRow}>
                                                     <Text
                                                         style={[
@@ -2110,7 +2144,11 @@ export default function App() {
                                         style={styles.mobileZoomButton}
                                         onPress={() =>
                                             setBoardZoom((previous) =>
-                                                clamp(previous - 0.1, 0.75, 1.8),
+                                                clamp(
+                                                    previous - 0.1,
+                                                    MIN_BOARD_ZOOM,
+                                                    MAX_BOARD_ZOOM,
+                                                ),
                                             )
                                         }
                                     >
@@ -2128,7 +2166,11 @@ export default function App() {
                                         style={styles.mobileZoomButton}
                                         onPress={() =>
                                             setBoardZoom((previous) =>
-                                                clamp(previous + 0.1, 0.75, 1.8),
+                                                clamp(
+                                                    previous + 0.1,
+                                                    MIN_BOARD_ZOOM,
+                                                    MAX_BOARD_ZOOM,
+                                                ),
                                             )
                                         }
                                     >
@@ -2267,6 +2309,13 @@ const styles = StyleSheet.create({
     cornerSub: {
         color: "#d1d5db",
         flexShrink: 1,
+    },
+    playerStatusBadge: {
+        alignSelf: "flex-start",
+        borderWidth: 2,
+        borderRadius: 999,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
     },
     resetButton: {
         backgroundColor: "#1d4ed8",
