@@ -1,10 +1,15 @@
 import { supabase, supabaseConfigured } from "./supabase.js";
 import { normalizeUsername } from "./username.js";
+import {
+    PLAYER_COLORS,
+    PLAYER_STATUS,
+    SESSION_MODES,
+    normalizePlayerColor,
+    normalizeSessionMode,
+    normalizeStatus,
+} from "./sessionSchema.js";
 
 const LOG_PREFIX = "[supabase][gameApi]";
-const PLAYER_COLORS = ["white", "red", "black", "blue"];
-const PLAYER_STATUS = new Set(["idle", "in_game"]);
-const SESSION_MODES = new Set(["local", "remote_create", "remote_join"]);
 const REMOTE_GAME_NOT_FOUND_CODE = "REMOTE_GAME_NOT_FOUND";
 
 function asPayload(gameState) {
@@ -360,15 +365,11 @@ export async function getAuthenticatedUserId() {
 
 export function buildPlayerStatusPayload(statusInput = {}) {
     const requestedStatus = statusInput?.status ?? "idle";
-    const status = PLAYER_STATUS.has(requestedStatus) ? requestedStatus : "idle";
+    const status = normalizeStatus(requestedStatus, "idle");
     const requestedMode = statusInput?.sessionMode ?? "local";
-    const sessionMode = SESSION_MODES.has(requestedMode)
-        ? requestedMode
-        : "local";
+    const sessionMode = normalizeSessionMode(requestedMode, "local");
     const requestedColor = statusInput?.currentColor ?? null;
-    const currentColor = PLAYER_COLORS.includes(requestedColor)
-        ? requestedColor
-        : null;
+    const currentColor = normalizePlayerColor(requestedColor, null);
     const currentGameId =
         typeof statusInput?.currentGameId === "string" &&
         statusInput.currentGameId.trim().length > 0

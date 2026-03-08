@@ -1,6 +1,7 @@
 import { BOARD_SIZE, PLAYERS } from "./constants.js";
 import { isPlayable, keyOf } from "./board.js";
 import { createCapturesBy } from "./engine.js";
+import { normalizeCapturesBy } from "../lib/sessionSchema.js";
 
 export function parseRemoteState(row) {
   let board = {};
@@ -22,10 +23,7 @@ export function parseRemoteState(row) {
     moveCount = Number.isFinite(pgnPayload?.moveCount)
       ? pgnPayload.moveCount
       : 0;
-    capturesBy = {
-      ...createCapturesBy(),
-      ...(pgnPayload?.capturesBy ?? {}),
-    };
+    capturesBy = normalizeCapturesBy(pgnPayload?.capturesBy);
     winner = pgnPayload?.winner ?? null;
   } catch {
     moveCount = 0;
