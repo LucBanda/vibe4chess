@@ -118,13 +118,7 @@ export default function App() {
     const stageWidth = Math.max(width - effectiveSidebarWidth, 220);
     const scorePanelWidth = clamp(Math.floor(stageWidth * 0.18), 108, 180);
     const boardPixelSize = Math.floor(Math.min(stageWidth - 20, height - 20));
-    const renderedBoardSize = Math.floor(
-        clamp(
-            boardPixelSize,
-            196,
-            900,
-        ),
-    );
+    const renderedBoardSize = Math.floor(clamp(boardPixelSize, 196, 900));
     const squareSize = Math.floor(renderedBoardSize / BOARD_SIZE);
     const boardSize = squareSize * BOARD_SIZE;
     const menuShortSide = isCompactLayout
@@ -136,10 +130,26 @@ export default function App() {
     const panelRadius = clamp(Math.floor(shortSide * 0.02), 8, 14);
 
     const menuScale = isSmallScreen ? 0.84 : 1;
-    const titleFontSize = clamp(Math.floor(shortSide * 0.027 * menuScale), 10, 18);
-    const valueFontSize = clamp(Math.floor(shortSide * 0.032 * menuScale), 12, 21);
-    const subFontSize = clamp(Math.floor(shortSide * 0.022 * menuScale), 10, 15);
-    const buttonFontSize = clamp(Math.floor(menuShortSide * 0.1 * menuScale), 9, 14);
+    const titleFontSize = clamp(
+        Math.floor(shortSide * 0.027 * menuScale),
+        10,
+        18,
+    );
+    const valueFontSize = clamp(
+        Math.floor(shortSide * 0.032 * menuScale),
+        12,
+        21,
+    );
+    const subFontSize = clamp(
+        Math.floor(shortSide * 0.022 * menuScale),
+        10,
+        15,
+    );
+    const buttonFontSize = clamp(
+        Math.floor(menuShortSide * 0.1 * menuScale),
+        9,
+        14,
+    );
     const pieceFontSize = clamp(Math.floor(squareSize * 0.72), 12, 40);
 
     const resetButtonVerticalPadding = clamp(
@@ -157,7 +167,8 @@ export default function App() {
     const useCompactInGameMenu = isSmallScreen && isInGame;
     const zoomPercent = Math.round(boardZoom * 100);
     const maxBoardPan = maxPanForZoom(boardSize, boardZoom);
-    const clampPanValue = (value) => clampPanForZoom(value, boardSize, boardZoom);
+    const clampPanValue = (value) =>
+        clampPanForZoom(value, boardSize, boardZoom);
     const resetBoardCamera = () => {
         setBoardZoom(1);
         setBoardPan({ x: 0, y: 0 });
@@ -197,7 +208,8 @@ export default function App() {
     const alivePlayers = stats.filter((s) => s.alive).map((s) => s.player);
     const winner = alivePlayers.length === 1 ? alivePlayers[0] : null;
     const currentGameState = useMemo(
-        () => createGameSnapshot({ board, turn, moveCount, capturesBy, winner }),
+        () =>
+            createGameSnapshot({ board, turn, moveCount, capturesBy, winner }),
         [board, turn, moveCount, capturesBy, winner],
     );
     const playerColorLabel = PLAYER_LABEL[localPlayerColor] ?? "Inconnue";
@@ -283,7 +295,10 @@ export default function App() {
                 const center = centerBetweenTouches(touches[0], touches[1]);
                 touchGestureRef.current = {
                     mode: "pinch",
-                    startDistance: distanceBetweenTouches(touches[0], touches[1]),
+                    startDistance: distanceBetweenTouches(
+                        touches[0],
+                        touches[1],
+                    ),
                     startCenter: center,
                     startPan: boardPanRef.current,
                     startZoom: boardZoomRef.current,
@@ -293,7 +308,9 @@ export default function App() {
             const center = centerBetweenTouches(touches[0], touches[1]);
             const distance = distanceBetweenTouches(touches[0], touches[1]);
             const ratio =
-                gesture.startDistance > 0 ? distance / gesture.startDistance : 1;
+                gesture.startDistance > 0
+                    ? distance / gesture.startDistance
+                    : 1;
             const nextZoom = clamp(
                 gesture.startZoom * ratio,
                 MIN_BOARD_ZOOM,
@@ -612,16 +629,27 @@ export default function App() {
         }
 
         try {
-            const remoteGame = await fetchRemoteGame(pendingRemoteResume.gameId);
+            const remoteGame = await fetchRemoteGame(
+                pendingRemoteResume.gameId,
+            );
             const parsed = parseRemoteState(remoteGame);
             const resumedColor =
                 pendingRemoteResume.currentColor ??
-                colorOfPlayer(remoteGame.player_ids, normalizedPlayerUsername) ??
+                colorOfPlayer(
+                    remoteGame.player_ids,
+                    normalizedPlayerUsername,
+                ) ??
                 "white";
             applyGameState(parsed);
-            setPlayMode(pendingRemoteResume.sessionMode === "remote_create" ? "create" : "join");
+            setPlayMode(
+                pendingRemoteResume.sessionMode === "remote_create"
+                    ? "create"
+                    : "join",
+            );
             setRemoteGameId(pendingRemoteResume.gameId);
-            setRemotePlayerIds(remoteGame.player_ids ?? pendingRemoteResume.playerIds ?? {});
+            setRemotePlayerIds(
+                remoteGame.player_ids ?? pendingRemoteResume.playerIds ?? {},
+            );
             setRemoteUpdatedAt(remoteGame.updated_at ?? null);
             setIsRemoteOwner(Boolean(pendingRemoteResume.isOwner));
             setLocalPlayerColor(resumedColor);
@@ -786,10 +814,7 @@ export default function App() {
             setRemotePlayerIds(remoteGame.player_ids ?? {});
             const assignedColor =
                 result.assigned_color ??
-                colorOfPlayer(
-                    remoteGame.player_ids,
-                    username,
-                ) ??
+                colorOfPlayer(remoteGame.player_ids, username) ??
                 joinColor;
             applyGameState(parsed);
             setRemoteUpdatedAt(remoteGame.updated_at ?? null);
@@ -845,7 +870,9 @@ export default function App() {
                 white: "human",
             }));
         }
-        setSyncMessage(nextMode === "local" ? "Mode local" : "Remote: non synchronisé");
+        setSyncMessage(
+            nextMode === "local" ? "Mode local" : "Remote: non synchronisé",
+        );
     };
 
     const onQuitGame = async () => {
@@ -867,14 +894,16 @@ export default function App() {
         if (isRemoteSession && remoteGameId) {
             setPendingRemoteResume({
                 gameId: remoteGameId,
-                sessionMode: playMode === "create" ? "remote_create" : "remote_join",
+                sessionMode:
+                    playMode === "create" ? "remote_create" : "remote_join",
                 currentColor: localPlayerColor,
                 isOwner: isRemoteOwner,
                 playerIds: remotePlayerIds,
             });
             void persistRemoteResumeHint({
                 gameId: remoteGameId,
-                sessionMode: playMode === "create" ? "remote_create" : "remote_join",
+                sessionMode:
+                    playMode === "create" ? "remote_create" : "remote_join",
                 currentColor: localPlayerColor,
                 isOwner: isRemoteOwner,
             });
@@ -944,14 +973,16 @@ export default function App() {
         playMode === "local"
             ? controlByColor[turn]
             : remotePlayerIds[turn] === "robot"
-                ? "robot"
-                : "human";
+              ? "robot"
+              : "human";
     const getPanelStatusLabel = (panelKey) => {
         if (playMode === "local") {
             if (controlByColor[panelKey] === "robot") {
                 return "Robot";
             }
-            return panelKey === localPlayerColor ? displayPlayerUsername : "Humain";
+            return panelKey === localPlayerColor
+                ? displayPlayerUsername
+                : "Humain";
         }
         if (remotePlayerIds[panelKey] === "robot") {
             return "Robot";
@@ -1003,16 +1034,18 @@ export default function App() {
         let cancelled = false;
 
         const loadResumeHint = async () => {
-            const localSession = await loadLocalSession(normalizedPlayerUsername);
+            const localSession = await loadLocalSession(
+                normalizedPlayerUsername,
+            );
             if (cancelled) {
                 return;
             }
 
             const canResumeRemote = Boolean(
                 localSession?.status === "in_game" &&
-                    (localSession?.sessionMode === "remote_create" ||
-                        localSession?.sessionMode === "remote_join") &&
-                    localSession?.currentGameId,
+                (localSession?.sessionMode === "remote_create" ||
+                    localSession?.sessionMode === "remote_join") &&
+                localSession?.currentGameId,
             );
             if (!canResumeRemote) {
                 setPendingRemoteResume(null);
@@ -1025,8 +1058,14 @@ export default function App() {
                 isOwner: Boolean(localSession.isOwner),
                 playerIds: {},
             });
-            setPlayMode(localSession.sessionMode === "remote_create" ? "create" : "join");
-            setSyncMessage(`Partie distante prête à reprendre (${normalizedPlayerUsername})`);
+            setPlayMode(
+                localSession.sessionMode === "remote_create"
+                    ? "create"
+                    : "join",
+            );
+            setSyncMessage(
+                `Partie distante prête à reprendre (${normalizedPlayerUsername})`,
+            );
         };
 
         void loadResumeHint();
@@ -1056,7 +1095,9 @@ export default function App() {
                 }
 
                 const sessionMode = statusRow.session_mode;
-                const colorFromStatus = PLAYERS.includes(statusRow.current_color)
+                const colorFromStatus = PLAYERS.includes(
+                    statusRow.current_color,
+                )
                     ? statusRow.current_color
                     : null;
 
@@ -1065,8 +1106,8 @@ export default function App() {
                         sessionMode === "remote_create"
                             ? "create"
                             : sessionMode === "remote_join"
-                                ? "join"
-                                : "local",
+                              ? "join"
+                              : "local",
                     );
                     if (colorFromStatus) {
                         setJoinColor(colorFromStatus);
@@ -1079,7 +1120,9 @@ export default function App() {
                 if (sessionMode === "local") {
                     setPendingRemoteResume(null);
                     setPlayMode("local");
-                    setSyncMessage(`Session locale détectée (${requestedUsername})`);
+                    setSyncMessage(
+                        `Session locale détectée (${requestedUsername})`,
+                    );
                     return;
                 }
 
@@ -1087,9 +1130,7 @@ export default function App() {
                 if (!gameId) {
                     return;
                 }
-                const resolvedColor =
-                    colorFromStatus ??
-                    "white";
+                const resolvedColor = colorFromStatus ?? "white";
                 setPendingRemoteResume({
                     gameId,
                     sessionMode,
@@ -1097,8 +1138,12 @@ export default function App() {
                     isOwner: Boolean(statusRow.is_owner),
                     playerIds: statusRow.player_ids ?? {},
                 });
-                setPlayMode(sessionMode === "remote_create" ? "create" : "join");
-                setSyncMessage(`Partie distante prête à reprendre (${requestedUsername})`);
+                setPlayMode(
+                    sessionMode === "remote_create" ? "create" : "join",
+                );
+                setSyncMessage(
+                    `Partie distante prête à reprendre (${requestedUsername})`,
+                );
             } catch (error) {
                 if (!cancelled) {
                     console.error("Player status restore failed", error);
@@ -1111,7 +1156,12 @@ export default function App() {
         return () => {
             cancelled = true;
         };
-    }, [playerUsername, normalizedPlayerUsername, supabaseConfigured, isInGame]);
+    }, [
+        playerUsername,
+        normalizedPlayerUsername,
+        supabaseConfigured,
+        isInGame,
+    ]);
 
     useEffect(() => {
         if (!isInGame || winner || turnControlMode !== "robot") {
@@ -1197,7 +1247,12 @@ export default function App() {
     }, [isInGame, playMode, supabaseConfigured]);
 
     useEffect(() => {
-        if (!isInGame || playMode === "local" || !remoteGameId || !supabaseConfigured) {
+        if (
+            !isInGame ||
+            playMode === "local" ||
+            !remoteGameId ||
+            !supabaseConfigured
+        ) {
             return undefined;
         }
 
@@ -1294,7 +1349,12 @@ export default function App() {
     }, [isInGame, playMode, remoteGameId, supabaseConfigured]);
 
     useEffect(() => {
-        if (!isInGame || playMode === "local" || !remoteGameId || !supabaseConfigured) {
+        if (
+            !isInGame ||
+            playMode === "local" ||
+            !remoteGameId ||
+            !supabaseConfigured
+        ) {
             setWaitingPlayersMessage(null);
             return undefined;
         }
@@ -1303,7 +1363,9 @@ export default function App() {
         let intervalId = null;
 
         const updateWaitingStatus = async () => {
-            const missingSeats = PLAYERS.filter((color) => !remotePlayerIds[color]);
+            const missingSeats = PLAYERS.filter(
+                (color) => !remotePlayerIds[color],
+            );
             if (missingSeats.length > 0) {
                 if (!cancelled) {
                     setWaitingPlayersMessage(
@@ -1341,14 +1403,16 @@ export default function App() {
                 return;
             }
 
-            const disconnectedPlayers = humanPlayers.filter((username, index) => {
-                const statusRow = statuses[index];
-                return (
-                    !statusRow ||
-                    statusRow.status !== "in_game" ||
-                    statusRow.current_game_id !== remoteGameId
-                );
-            });
+            const disconnectedPlayers = humanPlayers.filter(
+                (username, index) => {
+                    const statusRow = statuses[index];
+                    return (
+                        !statusRow ||
+                        statusRow.status !== "in_game" ||
+                        statusRow.current_game_id !== remoteGameId
+                    );
+                },
+            );
 
             if (disconnectedPlayers.length > 0) {
                 setWaitingPlayersMessage(
@@ -1379,30 +1443,46 @@ export default function App() {
             <View
                 style={[
                     styles.layoutRoot,
-                    { flexDirection: isCompactLayout ? "column" : "row" },
+                    {
+                        flexDirection: !isInGame
+                            ? "row"
+                            : isCompactLayout
+                              ? "column"
+                              : "row",
+                        justifyContent: !isInGame ? "center" : "flex-start",
+                    },
                 ]}
             >
                 <View
                     onLayout={(event) => {
-                        const nextWidth = Math.floor(event.nativeEvent.layout.width);
-                        if (nextWidth > 0 && nextWidth !== sidebarMeasuredWidth) {
+                        const nextWidth = Math.floor(
+                            event.nativeEvent.layout.width,
+                        );
+                        if (
+                            nextWidth > 0 &&
+                            nextWidth !== sidebarMeasuredWidth
+                        ) {
                             setSidebarMeasuredWidth(nextWidth);
                         }
                     }}
                     style={[
                         styles.sidebar,
                         {
+                            width: !isInGame
+                                ? Math.min(width - stageGap * 2, 880)
+                                : undefined,
                             maxWidth: isCompactLayout
                                 ? Math.min(width, isSmallScreen ? 420 : width)
                                 : isInGame
-                                    ? Math.floor(width * 0.26)
-                                    : Math.floor(width * 0.36),
+                                  ? Math.floor(width * 0.26)
+                                  : Math.min(width - stageGap * 2, 880),
                             padding: isSmallScreen
                                 ? Math.max(6, panelVerticalPadding - 3)
                                 : panelVerticalPadding,
                             gap: stageGap,
                             borderRightWidth: isCompactLayout ? 0 : 1,
-                            borderBottomWidth: isCompactLayout ? 1 : 0,
+                            borderBottomWidth:
+                                isCompactLayout && isInGame ? 1 : 0,
                             borderBottomColor: "rgba(255, 255, 255, 0.12)",
                         },
                     ]}
@@ -1414,388 +1494,617 @@ export default function App() {
                                 borderRadius: panelRadius,
                                 paddingHorizontal: panelHorizontalPadding,
                                 paddingVertical: panelVerticalPadding,
+                                flex: !isInGame ? 1 : 0,
+                                justifyContent: "flex-start",
                             },
                         ]}
                     >
                         {!isInGame ? (
-                            <Text
+                            <View
                                 style={[
-                                    styles.cornerTitle,
-                                    { fontSize: titleFontSize },
+                                    styles.menuFlow,
+                                    {
+                                        marginTop: lineSpacing * 2,
+                                        gap: lineSpacing * 2,
+                                    },
                                 ]}
                             >
-                                Menu
-                            </Text>
-                        ) : null}
-                        {!isInGame ? (
-                            <>
-                                <Text
-                                    style={[
-                                        styles.cornerSub,
-                                        {
-                                            fontSize: subFontSize,
-                                            marginTop: lineSpacing * 2,
-                                        },
-                                    ]}
-                                >
-                                    Nom du joueur
-                                </Text>
-                                <TextInput
-                                    style={[
-                                        styles.usernameInput,
-                                        {
-                                            marginTop: lineSpacing,
-                                        },
-                                    ]}
-                                    value={playerUsername}
-                                    onChangeText={(text) => {
-                                        setPlayerUsername(text);
-                                    }}
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                    maxLength={32}
-                                    placeholder="ex: alice"
-                                    placeholderTextColor="#94a3b8"
-                                />
                                 <View
                                     style={[
-                                        styles.visibilityRow,
+                                        styles.menuFormBlock,
                                         {
-                                            marginTop: lineSpacing,
                                             gap: lineSpacing,
-                                            flexWrap: isSmallScreen ? "wrap" : "nowrap",
                                         },
                                     ]}
                                 >
-                                    <Pressable
+                                    <View
                                         style={[
-                                            styles.visibilityButton,
-                                            playMode === "local"
-                                                ? styles.visibilityButtonActive
-                                                : null,
+                                            styles.menuSection,
+                                            styles.menuTypeSection,
                                         ]}
-                                        onPress={() => selectPlayMode("local")}
                                     >
-                                        <Text style={styles.visibilityText}>
-                                            {isSmallScreen ? "⌂ Local" : "Local"}
+                                        <Text
+                                            style={[
+                                                styles.menuSectionLabel,
+                                                { fontSize: subFontSize },
+                                            ]}
+                                        >
+                                            Joueur
                                         </Text>
-                                    </Pressable>
-                                    <Pressable
-                                        style={[
-                                            styles.visibilityButton,
-                                            playMode === "create"
-                                                ? styles.visibilityButtonActive
-                                                : null,
-                                            remoteModesDisabled
-                                                ? styles.visibilityButtonDisabled
-                                                : null,
-                                        ]}
-                                        onPress={() => selectPlayMode("create")}
-                                        disabled={remoteModesDisabled}
-                                    >
-                                        <Text style={styles.visibilityText}>
-                                            {isSmallScreen ? "＋ Créer" : "Créer remote"}
-                                        </Text>
-                                    </Pressable>
-                                    <Pressable
-                                        style={[
-                                            styles.visibilityButton,
-                                            playMode === "join"
-                                                ? styles.visibilityButtonActive
-                                                : null,
-                                            remoteModesDisabled
-                                                ? styles.visibilityButtonDisabled
-                                                : null,
-                                        ]}
-                                        onPress={() => selectPlayMode("join")}
-                                        disabled={remoteModesDisabled}
-                                    >
-                                        <Text style={styles.visibilityText}>
-                                            {isSmallScreen ? "↔ Rejoindre" : "Rejoindre remote"}
-                                        </Text>
-                                    </Pressable>
-                                </View>
+                                        <TextInput
+                                            style={[
+                                                styles.usernameInput,
+                                                {
+                                                    marginTop: Math.max(
+                                                        2,
+                                                        lineSpacing - 1,
+                                                    ),
+                                                },
+                                            ]}
+                                            value={playerUsername}
+                                            onChangeText={(text) => {
+                                                setPlayerUsername(text);
+                                            }}
+                                            autoCapitalize="none"
+                                            autoCorrect={false}
+                                            maxLength={32}
+                                            placeholder="ex: alice"
+                                            placeholderTextColor="#94a3b8"
+                                        />
+                                    </View>
 
-                                {playMode !== "join" ? (
-                                    <>
+                                    <View style={styles.menuSection}>
                                         <Text
                                             style={[
-                                                styles.cornerSub,
-                                                {
-                                                    fontSize: subFontSize,
-                                                    marginTop: lineSpacing * 2,
-                                                },
+                                                styles.menuSectionLabel,
+                                                { fontSize: subFontSize },
                                             ]}
                                         >
-                                            Type des sièges
-                                        </Text>
-                                        {PLAYERS.map((color) => (
-                                            <View
-                                                key={`${color}-control`}
-                                                style={[
-                                                    styles.playerInputRow,
-                                                    { marginTop: lineSpacing },
-                                                ]}
-                                            >
-                                                <Text style={styles.playerInputLabel}>
-                                                    {PLAYER_LABEL[color]}
-                                                </Text>
-                                                <View style={styles.playerControlRow}>
-                                                    <Pressable
-                                                        style={[
-                                                            styles.controlButton,
-                                                            controlByColor[color] === "human"
-                                                                ? styles.controlButtonActive
-                                                                : null,
-                                                        ]}
-                                                        onPress={() =>
-                                                            setPlayerControl(color, "human")
-                                                        }
-                                                    >
-                                                        <Text style={styles.controlButtonText}>
-                                                            Humain
-                                                        </Text>
-                                                    </Pressable>
-                                                    <Pressable
-                                                        style={[
-                                                            styles.controlButton,
-                                                            controlByColor[color] === "robot"
-                                                                ? styles.controlButtonActive
-                                                                : null,
-                                                            playMode === "create" &&
-                                                            color === "white"
-                                                                ? styles.controlButtonDisabled
-                                                                : null,
-                                                        ]}
-                                                        onPress={() => {
-                                                            if (
-                                                                playMode === "create" &&
-                                                                color === "white"
-                                                            ) {
-                                                                return;
-                                                            }
-                                                            setPlayerControl(color, "robot");
-                                                        }}
-                                                        disabled={
-                                                            playMode === "create" &&
-                                                            color === "white"
-                                                        }
-                                                    >
-                                                        <Text style={styles.controlButtonText}>
-                                                            Robot
-                                                        </Text>
-                                                    </Pressable>
-                                                </View>
-                                            </View>
-                                        ))}
-                                    </>
-                                ) : (
-                                    <>
-                                        <Text
-                                            style={[
-                                                styles.cornerSub,
-                                                {
-                                                    fontSize: subFontSize,
-                                                    marginTop: lineSpacing * 2,
-                                                },
-                                            ]}
-                                        >
-                                            Parties disponibles
-                                        </Text>
-                                        <View
-                                            style={[
-                                                styles.joinableGamesContainer,
-                                                { marginTop: lineSpacing, gap: lineSpacing },
-                                            ]}
-                                        >
-                                            {joinableGames.map((game) => {
-                                                const freeSeats = freeSeatsOf(game.player_ids);
-                                                return (
-                                                    <Pressable
-                                                        key={game.id}
-                                                        style={[
-                                                            styles.joinableGameButton,
-                                                            selectedJoinGameId === game.id
-                                                                ? styles.visibilityButtonActive
-                                                                : null,
-                                                            !supabaseConfigured
-                                                                ? styles.joinableGameButtonDisabled
-                                                                : null,
-                                                        ]}
-                                                        onPress={() => {
-                                                            if (supabaseConfigured) {
-                                                                setSelectedJoinGameId(game.id);
-                                                            }
-                                                        }}
-                                                        disabled={!supabaseConfigured}
-                                                    >
-                                                        <Text style={styles.joinableGameTitle}>
-                                                            {game.id.slice(0, 8)}...
-                                                        </Text>
-                                                        <Text style={styles.joinableGameSub}>
-                                                            Places libres:{" "}
-                                                            {freeSeats
-                                                                .map(
-                                                                    (color) =>
-                                                                        PLAYER_LABEL[color],
-                                                                )
-                                                                .join(", ")}
-                                                        </Text>
-                                                    </Pressable>
-                                                );
-                                            })}
-                                            {joinableGames.length === 0 ? (
-                                                <Text style={styles.cornerSub}>
-                                                    Aucune partie joignable.
-                                                </Text>
-                                            ) : null}
-                                            <Pressable
-                                                style={[
-                                                    styles.refreshJoinablesButton,
-                                                    !canRefreshJoinables
-                                                        ? styles.joinColorButtonDisabled
-                                                        : null,
-                                                ]}
-                                                onPress={loadJoinableGames}
-                                                disabled={!canRefreshJoinables}
-                                            >
-                                                <Text style={styles.resetText}>
-                                                    {loadingJoinableGames
-                                                        ? "Chargement..."
-                                                        : "Rafraîchir la liste"}
-                                                </Text>
-                                            </Pressable>
-                                        </View>
-                                        <Text
-                                            style={[
-                                                styles.cornerSub,
-                                                {
-                                                    fontSize: subFontSize,
-                                                    marginTop: lineSpacing * 2,
-                                                },
-                                            ]}
-                                        >
-                                            Couleur à rejoindre
+                                            Type de partie
                                         </Text>
                                         <View
                                             style={[
                                                 styles.visibilityRow,
                                                 {
-                                                    marginTop: lineSpacing,
+                                                    marginTop: Math.max(
+                                                        2,
+                                                        lineSpacing - 1,
+                                                    ),
                                                     gap: lineSpacing,
-                                                    flexWrap: "wrap",
+                                                    flexWrap: isSmallScreen
+                                                        ? "wrap"
+                                                        : "nowrap",
                                                 },
                                             ]}
                                         >
-                                            {PLAYERS.map((color) => {
-                                                const isSeatFree =
-                                                    Boolean(selectedJoinGame) &&
-                                                    selectedJoinGameFreeSeats.includes(color);
-                                                return (
-                                                    <Pressable
-                                                        key={`join-${color}`}
+                                            <Pressable
+                                                style={[
+                                                    styles.visibilityButton,
+                                                    playMode === "local"
+                                                        ? styles.visibilityButtonActive
+                                                        : null,
+                                                ]}
+                                                onPress={() =>
+                                                    selectPlayMode("local")
+                                                }
+                                            >
+                                                <Text
+                                                    style={
+                                                        styles.visibilityText
+                                                    }
+                                                >
+                                                    {isSmallScreen
+                                                        ? "⌂ Local"
+                                                        : "Local"}
+                                                </Text>
+                                            </Pressable>
+                                            <Pressable
+                                                style={[
+                                                    styles.visibilityButton,
+                                                    playMode === "create"
+                                                        ? styles.visibilityButtonActive
+                                                        : null,
+                                                    remoteModesDisabled
+                                                        ? styles.visibilityButtonDisabled
+                                                        : null,
+                                                ]}
+                                                onPress={() =>
+                                                    selectPlayMode("create")
+                                                }
+                                                disabled={remoteModesDisabled}
+                                            >
+                                                <Text
+                                                    style={
+                                                        styles.visibilityText
+                                                    }
+                                                >
+                                                    {isSmallScreen
+                                                        ? "＋ Créer"
+                                                        : "Créer remote"}
+                                                </Text>
+                                            </Pressable>
+                                            <Pressable
+                                                style={[
+                                                    styles.visibilityButton,
+                                                    playMode === "join"
+                                                        ? styles.visibilityButtonActive
+                                                        : null,
+                                                    remoteModesDisabled
+                                                        ? styles.visibilityButtonDisabled
+                                                        : null,
+                                                ]}
+                                                onPress={() =>
+                                                    selectPlayMode("join")
+                                                }
+                                                disabled={remoteModesDisabled}
+                                            >
+                                                <Text
+                                                    style={
+                                                        styles.visibilityText
+                                                    }
+                                                >
+                                                    {isSmallScreen
+                                                        ? "↔ Rejoindre"
+                                                        : "Rejoindre remote"}
+                                                </Text>
+                                            </Pressable>
+                                        </View>
+                                    </View>
+
+                                    <View
+                                        style={[
+                                            styles.menuSection,
+                                            styles.menuOptionsSection,
+                                        ]}
+                                    >
+                                        <Text
+                                            style={[
+                                                styles.menuSectionLabel,
+                                                { fontSize: subFontSize },
+                                            ]}
+                                        >
+                                            Options de partie
+                                        </Text>
+                                        {playMode !== "join" ? (
+                                            <>
+                                                <Text
+                                                    style={[
+                                                        styles.cornerSub,
+                                                        {
+                                                            fontSize:
+                                                                subFontSize,
+                                                            marginTop:
+                                                                lineSpacing,
+                                                        },
+                                                    ]}
+                                                >
+                                                    Type des sièges
+                                                </Text>
+                                                {PLAYERS.map((color) => (
+                                                    <View
+                                                        key={`${color}-control`}
                                                         style={[
-                                                            styles.joinColorButton,
-                                                            joinColor === color
-                                                                ? styles.visibilityButtonActive
-                                                                : null,
-                                                            !isSeatFree
+                                                            styles.playerInputRow,
+                                                            {
+                                                                marginTop:
+                                                                    Math.max(
+                                                                        2,
+                                                                        lineSpacing -
+                                                                            1,
+                                                                    ),
+                                                            },
+                                                        ]}
+                                                    >
+                                                        <Text
+                                                            style={
+                                                                styles.playerInputLabel
+                                                            }
+                                                        >
+                                                            {
+                                                                PLAYER_LABEL[
+                                                                    color
+                                                                ]
+                                                            }
+                                                        </Text>
+                                                        <View
+                                                            style={
+                                                                styles.playerControlRow
+                                                            }
+                                                        >
+                                                            <Pressable
+                                                                style={[
+                                                                    styles.controlButton,
+                                                                    controlByColor[
+                                                                        color
+                                                                    ] ===
+                                                                    "human"
+                                                                        ? styles.controlButtonActive
+                                                                        : null,
+                                                                ]}
+                                                                onPress={() =>
+                                                                    setPlayerControl(
+                                                                        color,
+                                                                        "human",
+                                                                    )
+                                                                }
+                                                            >
+                                                                <Text
+                                                                    style={
+                                                                        styles.controlButtonText
+                                                                    }
+                                                                >
+                                                                    Humain
+                                                                </Text>
+                                                            </Pressable>
+                                                            <Pressable
+                                                                style={[
+                                                                    styles.controlButton,
+                                                                    controlByColor[
+                                                                        color
+                                                                    ] ===
+                                                                    "robot"
+                                                                        ? styles.controlButtonActive
+                                                                        : null,
+                                                                    playMode ===
+                                                                        "create" &&
+                                                                    color ===
+                                                                        "white"
+                                                                        ? styles.controlButtonDisabled
+                                                                        : null,
+                                                                ]}
+                                                                onPress={() => {
+                                                                    if (
+                                                                        playMode ===
+                                                                            "create" &&
+                                                                        color ===
+                                                                            "white"
+                                                                    ) {
+                                                                        return;
+                                                                    }
+                                                                    setPlayerControl(
+                                                                        color,
+                                                                        "robot",
+                                                                    );
+                                                                }}
+                                                                disabled={
+                                                                    playMode ===
+                                                                        "create" &&
+                                                                    color ===
+                                                                        "white"
+                                                                }
+                                                            >
+                                                                <Text
+                                                                    style={
+                                                                        styles.controlButtonText
+                                                                    }
+                                                                >
+                                                                    Robot
+                                                                </Text>
+                                                            </Pressable>
+                                                        </View>
+                                                    </View>
+                                                ))}
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Text
+                                                    style={[
+                                                        styles.cornerSub,
+                                                        {
+                                                            fontSize:
+                                                                subFontSize,
+                                                            marginTop:
+                                                                lineSpacing,
+                                                        },
+                                                    ]}
+                                                >
+                                                    Parties disponibles
+                                                </Text>
+                                                <View
+                                                    style={[
+                                                        styles.joinableGamesContainer,
+                                                        {
+                                                            marginTop: Math.max(
+                                                                2,
+                                                                lineSpacing - 1,
+                                                            ),
+                                                            gap: lineSpacing,
+                                                        },
+                                                    ]}
+                                                >
+                                                    {joinableGames.map(
+                                                        (game) => {
+                                                            const freeSeats =
+                                                                freeSeatsOf(
+                                                                    game.player_ids,
+                                                                );
+                                                            return (
+                                                                <Pressable
+                                                                    key={
+                                                                        game.id
+                                                                    }
+                                                                    style={[
+                                                                        styles.joinableGameButton,
+                                                                        selectedJoinGameId ===
+                                                                        game.id
+                                                                            ? styles.visibilityButtonActive
+                                                                            : null,
+                                                                        !supabaseConfigured
+                                                                            ? styles.joinableGameButtonDisabled
+                                                                            : null,
+                                                                    ]}
+                                                                    onPress={() => {
+                                                                        if (
+                                                                            supabaseConfigured
+                                                                        ) {
+                                                                            setSelectedJoinGameId(
+                                                                                game.id,
+                                                                            );
+                                                                        }
+                                                                    }}
+                                                                    disabled={
+                                                                        !supabaseConfigured
+                                                                    }
+                                                                >
+                                                                    <Text
+                                                                        style={
+                                                                            styles.joinableGameTitle
+                                                                        }
+                                                                    >
+                                                                        {game.id.slice(
+                                                                            0,
+                                                                            8,
+                                                                        )}
+                                                                        ...
+                                                                    </Text>
+                                                                    <Text
+                                                                        style={
+                                                                            styles.joinableGameSub
+                                                                        }
+                                                                    >
+                                                                        Places
+                                                                        libres:{" "}
+                                                                        {freeSeats
+                                                                            .map(
+                                                                                (
+                                                                                    color,
+                                                                                ) =>
+                                                                                    PLAYER_LABEL[
+                                                                                        color
+                                                                                    ],
+                                                                            )
+                                                                            .join(
+                                                                                ", ",
+                                                                            )}
+                                                                    </Text>
+                                                                </Pressable>
+                                                            );
+                                                        },
+                                                    )}
+                                                    {joinableGames.length ===
+                                                    0 ? (
+                                                        <Text
+                                                            style={
+                                                                styles.cornerSub
+                                                            }
+                                                        >
+                                                            Aucune partie
+                                                            joignable.
+                                                        </Text>
+                                                    ) : null}
+                                                    <Pressable
+                                                        style={[
+                                                            styles.refreshJoinablesButton,
+                                                            !canRefreshJoinables
                                                                 ? styles.joinColorButtonDisabled
                                                                 : null,
                                                         ]}
-                                                        onPress={() => {
-                                                            if (isSeatFree) {
-                                                                setJoinColor(color);
-                                                            }
-                                                        }}
-                                                        disabled={!isSeatFree}
+                                                        onPress={
+                                                            loadJoinableGames
+                                                        }
+                                                        disabled={
+                                                            !canRefreshJoinables
+                                                        }
                                                     >
-                                                        <Text style={styles.visibilityText}>
-                                                            {PLAYER_LABEL[color]}
+                                                        <Text
+                                                            style={
+                                                                styles.resetText
+                                                            }
+                                                        >
+                                                            {loadingJoinableGames
+                                                                ? "Chargement..."
+                                                                : "Rafraîchir la liste"}
                                                         </Text>
                                                     </Pressable>
-                                                );
-                                            })}
-                                        </View>
-                                    </>
-                                )}
+                                                </View>
+                                                <Text
+                                                    style={[
+                                                        styles.cornerSub,
+                                                        {
+                                                            fontSize:
+                                                                subFontSize,
+                                                            marginTop:
+                                                                lineSpacing,
+                                                        },
+                                                    ]}
+                                                >
+                                                    Couleur à rejoindre
+                                                </Text>
+                                                <View
+                                                    style={[
+                                                        styles.visibilityRow,
+                                                        {
+                                                            marginTop: Math.max(
+                                                                2,
+                                                                lineSpacing - 1,
+                                                            ),
+                                                            gap: lineSpacing,
+                                                            flexWrap: "wrap",
+                                                        },
+                                                    ]}
+                                                >
+                                                    {PLAYERS.map((color) => {
+                                                        const isSeatFree =
+                                                            Boolean(
+                                                                selectedJoinGame,
+                                                            ) &&
+                                                            selectedJoinGameFreeSeats.includes(
+                                                                color,
+                                                            );
+                                                        return (
+                                                            <Pressable
+                                                                key={`join-${color}`}
+                                                                style={[
+                                                                    styles.joinColorButton,
+                                                                    joinColor ===
+                                                                    color
+                                                                        ? styles.visibilityButtonActive
+                                                                        : null,
+                                                                    !isSeatFree
+                                                                        ? styles.joinColorButtonDisabled
+                                                                        : null,
+                                                                ]}
+                                                                onPress={() => {
+                                                                    if (
+                                                                        isSeatFree
+                                                                    ) {
+                                                                        setJoinColor(
+                                                                            color,
+                                                                        );
+                                                                    }
+                                                                }}
+                                                                disabled={
+                                                                    !isSeatFree
+                                                                }
+                                                            >
+                                                                <Text
+                                                                    style={
+                                                                        styles.visibilityText
+                                                                    }
+                                                                >
+                                                                    {
+                                                                        PLAYER_LABEL[
+                                                                            color
+                                                                        ]
+                                                                    }
+                                                                </Text>
+                                                            </Pressable>
+                                                        );
+                                                    })}
+                                                </View>
+                                            </>
+                                        )}
+                                    </View>
+                                </View>
 
-                                <Pressable
+                                <View
                                     style={[
-                                        styles.menuButtonSecondary,
-                                        {
-                                            marginTop: lineSpacing * 2,
-                                            paddingVertical: resetButtonVerticalPadding,
-                                            paddingHorizontal:
-                                                resetButtonHorizontalPadding,
-                                            borderRadius: clamp(
-                                                Math.floor(panelRadius * 0.7),
-                                                5,
-                                                10,
-                                            ),
-                                            opacity: canResumeRemoteGame ? 1 : 0.45,
-                                        },
+                                        styles.menuActionsBlock,
+                                        { gap: lineSpacing * 1.5 },
                                     ]}
-                                    onPress={resumePendingRemoteGame}
-                                    disabled={!canResumeRemoteGame}
                                 >
-                                    <Text
+                                    <Pressable
                                         style={[
-                                            styles.resetText,
-                                            { fontSize: buttonFontSize },
+                                            styles.menuButtonSecondary,
+                                            {
+                                                paddingVertical:
+                                                    resetButtonVerticalPadding,
+                                                paddingHorizontal:
+                                                    resetButtonHorizontalPadding,
+                                                borderRadius: clamp(
+                                                    Math.floor(
+                                                        panelRadius * 0.7,
+                                                    ),
+                                                    5,
+                                                    10,
+                                                ),
+                                                opacity: canResumeRemoteGame
+                                                    ? 1
+                                                    : 0.45,
+                                            },
                                         ]}
+                                        onPress={resumePendingRemoteGame}
+                                        disabled={!canResumeRemoteGame}
                                     >
-                                        {isSmallScreen
-                                            ? "↺ Reprendre remote"
-                                            : "Reprendre partie distante"}
-                                    </Text>
-                                </Pressable>
-
-                                <Pressable
-                                    style={[
-                                        styles.menuButtonSecondary,
-                                        {
-                                            marginTop: lineSpacing * 2,
-                                            paddingVertical: resetButtonVerticalPadding,
-                                            paddingHorizontal:
-                                                resetButtonHorizontalPadding,
-                                            borderRadius: clamp(
-                                                Math.floor(panelRadius * 0.7),
-                                                5,
-                                                10,
-                                            ),
-                                            opacity: supabaseConfigured ? 1 : 0.5,
-                                        },
-                                    ]}
-                                    onPress={
-                                        playMode === "local"
-                                            ? startLocalGame
-                                            : playMode === "create"
-                                                ? onCreateRemote
-                                                : onJoinRemote
-                                    }
-                                    disabled={!supabaseConfigured && playMode !== "local"}
-                                >
                                         <Text
                                             style={[
                                                 styles.resetText,
                                                 { fontSize: buttonFontSize },
                                             ]}
                                         >
-                                        {playMode === "local"
-                                            ? isSmallScreen
-                                                ? "▶ Nouvelle partie"
-                                                : "Nouvelle partie"
-                                            : playMode === "create"
+                                            {isSmallScreen
+                                                ? "↺ Reprendre remote"
+                                                : "Reprendre partie distante"}
+                                        </Text>
+                                    </Pressable>
+
+                                    <Pressable
+                                        style={[
+                                            styles.menuButtonSecondary,
+                                            {
+                                                paddingVertical:
+                                                    resetButtonVerticalPadding,
+                                                paddingHorizontal:
+                                                    resetButtonHorizontalPadding,
+                                                borderRadius: clamp(
+                                                    Math.floor(
+                                                        panelRadius * 0.7,
+                                                    ),
+                                                    5,
+                                                    10,
+                                                ),
+                                                opacity: supabaseConfigured
+                                                    ? 1
+                                                    : 0.5,
+                                            },
+                                        ]}
+                                        onPress={
+                                            playMode === "local"
+                                                ? startLocalGame
+                                                : playMode === "create"
+                                                  ? onCreateRemote
+                                                  : onJoinRemote
+                                        }
+                                        disabled={
+                                            !supabaseConfigured &&
+                                            playMode !== "local"
+                                        }
+                                    >
+                                        <Text
+                                            style={[
+                                                styles.resetText,
+                                                { fontSize: buttonFontSize },
+                                            ]}
+                                        >
+                                            {playMode === "local"
                                                 ? isSmallScreen
-                                                    ? "＋ Créer remote"
-                                                    : "Créer remote"
-                                                : isSmallScreen
+                                                    ? "▶ Nouvelle partie"
+                                                    : "Nouvelle partie"
+                                                : playMode === "create"
+                                                  ? isSmallScreen
+                                                      ? "＋ Créer remote"
+                                                      : "Créer remote"
+                                                  : isSmallScreen
                                                     ? "↔ Rejoindre"
                                                     : "Rejoindre"}
-                                    </Text>
-                                </Pressable>
-                            </>
+                                        </Text>
+                                    </Pressable>
+
+                                    {!supabaseConfigured ? (
+                                        <Text
+                                            style={[
+                                                styles.cornerSub,
+                                                {
+                                                    fontSize: subFontSize,
+                                                    color: "#fca5a5",
+                                                },
+                                            ]}
+                                        >
+                                            Supabase non configuré (.env requis)
+                                        </Text>
+                                    ) : null}
+                                </View>
+                            </View>
                         ) : (
                             <>
                                 <View
@@ -1813,23 +2122,36 @@ export default function App() {
                                                 style={[
                                                     styles.menuButtonSecondary,
                                                     styles.collapsedActionButton,
-                                                    { opacity: supabaseConfigured ? 1 : 0.5 },
+                                                    {
+                                                        opacity:
+                                                            supabaseConfigured
+                                                                ? 1
+                                                                : 0.5,
+                                                    },
                                                 ]}
                                                 onPress={onSyncRemote}
                                                 disabled={!supabaseConfigured}
                                             >
-                                                <Text style={styles.resetText}>⟳ Sync</Text>
+                                                <Text style={styles.resetText}>
+                                                    ⟳ Sync
+                                                </Text>
                                             </Pressable>
                                         ) : null}
                                         <Pressable
                                             style={[
                                                 styles.resetButton,
                                                 styles.collapsedActionButton,
-                                                { marginLeft: canUseRemote ? lineSpacing : 0 },
+                                                {
+                                                    marginLeft: canUseRemote
+                                                        ? lineSpacing
+                                                        : 0,
+                                                },
                                             ]}
                                             onPress={onQuitGame}
                                         >
-                                            <Text style={styles.resetText}>⏹ Quitter</Text>
+                                            <Text style={styles.resetText}>
+                                                ⏹ Quitter
+                                            </Text>
                                         </Pressable>
                                     </View>
                                     {canUseRemote ? (
@@ -1848,30 +2170,16 @@ export default function App() {
                                 </View>
                             </>
                         )}
-                        {!supabaseConfigured && !isInGame ? (
-                            <Text
-                                style={[
-                                    styles.cornerSub,
-                                    {
-                                        fontSize: subFontSize,
-                                        marginTop: lineSpacing,
-                                        color: "#fca5a5",
-                                    },
-                                ]}
-                            >
-                                Supabase non configuré (.env requis)
-                            </Text>
-                        ) : null}
                     </View>
                 </View>
 
-                <View
-                    style={[
-                        styles.stage,
-                        { paddingHorizontal: stageGap, paddingVertical: 0 },
-                    ]}
-                >
-                    {isInGame ? (
+                {isInGame ? (
+                    <View
+                        style={[
+                            styles.stage,
+                            { paddingHorizontal: stageGap, paddingVertical: 0 },
+                        ]}
+                    >
                         <>
                             <View style={styles.boardLayer}>
                                 <View
@@ -1887,8 +2195,12 @@ export default function App() {
                                             ],
                                         },
                                     ]}
-                                    onStartShouldSetResponderCapture={shouldCaptureBoardGesture}
-                                    onMoveShouldSetResponderCapture={shouldCaptureBoardPanMove}
+                                    onStartShouldSetResponderCapture={
+                                        shouldCaptureBoardGesture
+                                    }
+                                    onMoveShouldSetResponderCapture={
+                                        shouldCaptureBoardPanMove
+                                    }
                                     onTouchStart={onBoardTouchStart}
                                     onResponderGrant={onBoardGestureStart}
                                     onResponderMove={onBoardGestureMove}
@@ -1918,10 +2230,15 @@ export default function App() {
                                                 const isSelected =
                                                     selected?.x === boardX &&
                                                     selected?.y === boardY;
-                                                const squareKey = keyOf(boardX, boardY);
-                                                const isLegalTarget = legalTargets.has(squareKey);
+                                                const squareKey = keyOf(
+                                                    boardX,
+                                                    boardY,
+                                                );
+                                                const isLegalTarget =
+                                                    legalTargets.has(squareKey);
                                                 const isLastMoveFrom =
-                                                    lastMove?.fromX === boardX &&
+                                                    lastMove?.fromX ===
+                                                        boardX &&
                                                     lastMove?.fromY === boardY;
                                                 const isLastMoveTo =
                                                     lastMove?.toX === boardX &&
@@ -1934,25 +2251,30 @@ export default function App() {
                                                             {
                                                                 width: squareSize,
                                                                 height: squareSize,
-                                                                backgroundColor: playable
-                                                                    ? isLight
-                                                                        ? "#f4e4c8"
-                                                                        : "#946e4d"
-                                                                    : "transparent",
-                                                                borderColor: isSelected
-                                                                    ? "#f59e0b"
-                                                                    : isLastMoveTo
-                                                                        ? "#22c55e"
-                                                                        : isLastMoveFrom
+                                                                backgroundColor:
+                                                                    playable
+                                                                        ? isLight
+                                                                            ? "#f4e4c8"
+                                                                            : "#946e4d"
+                                                                        : "transparent",
+                                                                borderColor:
+                                                                    isSelected
+                                                                        ? "#f59e0b"
+                                                                        : isLastMoveTo
+                                                                          ? "#22c55e"
+                                                                          : isLastMoveFrom
                                                                             ? "#60a5fa"
                                                                             : isLegalTarget
-                                                                                ? "rgba(99, 102, 241, 0.75)"
-                                                                                : "transparent",
+                                                                              ? "rgba(99, 102, 241, 0.75)"
+                                                                              : "transparent",
                                                             },
                                                         ]}
                                                         onPress={() => {
                                                             if (playable) {
-                                                                selectOrMove(boardX, boardY);
+                                                                selectOrMove(
+                                                                    boardX,
+                                                                    boardY,
+                                                                );
                                                             }
                                                         }}
                                                     >
@@ -1962,22 +2284,31 @@ export default function App() {
                                                                     styles.piece,
                                                                     {
                                                                         color: PLAYER_COLOR[
-                                                                            piece.player
+                                                                            piece
+                                                                                .player
                                                                         ],
-                                                                        fontSize: pieceFontSize,
+                                                                        fontSize:
+                                                                            pieceFontSize,
                                                                         textShadowColor:
-                                                                            piece.player === "black"
+                                                                            piece.player ===
+                                                                            "black"
                                                                                 ? "rgba(255, 255, 255, 0.95)"
                                                                                 : "rgba(0, 0, 0, 0.85)",
-                                                                        textShadowOffset: {
-                                                                            width: 0,
-                                                                            height: 1,
-                                                                        },
+                                                                        textShadowOffset:
+                                                                            {
+                                                                                width: 0,
+                                                                                height: 1,
+                                                                            },
                                                                         textShadowRadius: 2,
                                                                     },
                                                                 ]}
                                                             >
-                                                                {PIECE_SYMBOL[piece.type]}
+                                                                {
+                                                                    PIECE_SYMBOL[
+                                                                        piece
+                                                                            .type
+                                                                    ]
+                                                                }
                                                             </Text>
                                                         ) : null}
                                                     </Pressable>
@@ -1988,96 +2319,147 @@ export default function App() {
 
                                     {!isSmallScreen
                                         ? playerPanels.map((panel) => (
-                                        <View
-                                            key={panel.key}
-                                            style={[
-                                                styles.cornerPanel,
-                                                styles.cornerOverlayPanel,
-                                                {
-                                                    width: scorePanelWidth,
-                                                    borderRadius: panelRadius,
-                                                    paddingHorizontal: panelHorizontalPadding,
-                                                    paddingVertical: panelVerticalPadding,
-                                                    top: panel.top,
-                                                    right: panel.right,
-                                                    bottom: panel.bottom,
-                                                    left: panel.left,
-                                                },
-                                            ]}
-                                        >
-                                            <View style={styles.cornerTextStack}>
-                                                <Text
-                                                    style={[
-                                                        styles.cornerTitle,
-                                                        { fontSize: titleFontSize },
-                                                    ]}
-                                                >
-                                                    {panel.label}
-                                                </Text>
-                                                <View
-                                                    style={[
-                                                        styles.playerStatusBadge,
-                                                        isPanelActiveTurn(panel.key)
-                                                            ? styles.playerStatusBadgeActive
-                                                            : null,
-                                                        {
-                                                            borderColor: getPanelStatusTone(panel.key),
-                                                            backgroundColor: getPanelStatusBackground(panel.key),
-                                                            borderWidth: isPanelActiveTurn(panel.key) ? 3 : 2,
-                                                        },
-                                                    ]}
-                                                >
-                                                    <Text
-                                                        style={[
-                                                            styles.playerStatusText,
-                                                            {
-                                                                fontSize: subFontSize,
-                                                                color: getPanelStatusTextColor(panel.key),
-                                                            },
-                                                        ]}
-                                                    >
-                                                        {getPanelStatusLabel(panel.key)}
-                                                    </Text>
-                                                </View>
-                                                <View style={styles.cornerRow}>
-                                                    <Text
-                                                        style={[
-                                                            styles.cornerSub,
-                                                            { fontSize: subFontSize },
-                                                        ]}
-                                                    >
-                                                        Pièces
-                                                    </Text>
-                                                    <Text
-                                                        style={[
-                                                            styles.cornerSub,
-                                                            { fontSize: subFontSize },
-                                                        ]}
-                                                    >
-                                                        {panel.stats?.pieces ?? 0}
-                                                    </Text>
-                                                </View>
-                                                <View style={styles.cornerRow}>
-                                                    <Text
-                                                        style={[
-                                                            styles.cornerSub,
-                                                            { fontSize: subFontSize },
-                                                        ]}
-                                                    >
-                                                        Prises
-                                                    </Text>
-                                                    <Text
-                                                        style={[
-                                                            styles.cornerSub,
-                                                            { fontSize: subFontSize },
-                                                        ]}
-                                                    >
-                                                        {panel.stats?.captures ?? 0}
-                                                    </Text>
-                                                </View>
-                                            </View>
-                                        </View>
-                                    ))
+                                              <View
+                                                  key={panel.key}
+                                                  style={[
+                                                      styles.cornerPanel,
+                                                      styles.cornerOverlayPanel,
+                                                      {
+                                                          width: scorePanelWidth,
+                                                          borderRadius:
+                                                              panelRadius,
+                                                          paddingHorizontal:
+                                                              panelHorizontalPadding,
+                                                          paddingVertical:
+                                                              panelVerticalPadding,
+                                                          top: panel.top,
+                                                          right: panel.right,
+                                                          bottom: panel.bottom,
+                                                          left: panel.left,
+                                                      },
+                                                  ]}
+                                              >
+                                                  <View
+                                                      style={
+                                                          styles.cornerTextStack
+                                                      }
+                                                  >
+                                                      <Text
+                                                          style={[
+                                                              styles.cornerTitle,
+                                                              {
+                                                                  fontSize:
+                                                                      titleFontSize,
+                                                              },
+                                                          ]}
+                                                      >
+                                                          {panel.label}
+                                                      </Text>
+                                                      <View
+                                                          style={[
+                                                              styles.playerStatusBadge,
+                                                              isPanelActiveTurn(
+                                                                  panel.key,
+                                                              )
+                                                                  ? styles.playerStatusBadgeActive
+                                                                  : null,
+                                                              {
+                                                                  borderColor:
+                                                                      getPanelStatusTone(
+                                                                          panel.key,
+                                                                      ),
+                                                                  backgroundColor:
+                                                                      getPanelStatusBackground(
+                                                                          panel.key,
+                                                                      ),
+                                                                  borderWidth:
+                                                                      isPanelActiveTurn(
+                                                                          panel.key,
+                                                                      )
+                                                                          ? 3
+                                                                          : 2,
+                                                              },
+                                                          ]}
+                                                      >
+                                                          <Text
+                                                              style={[
+                                                                  styles.playerStatusText,
+                                                                  {
+                                                                      fontSize:
+                                                                          subFontSize,
+                                                                      color: getPanelStatusTextColor(
+                                                                          panel.key,
+                                                                      ),
+                                                                  },
+                                                              ]}
+                                                          >
+                                                              {getPanelStatusLabel(
+                                                                  panel.key,
+                                                              )}
+                                                          </Text>
+                                                      </View>
+                                                      <View
+                                                          style={
+                                                              styles.cornerRow
+                                                          }
+                                                      >
+                                                          <Text
+                                                              style={[
+                                                                  styles.cornerSub,
+                                                                  {
+                                                                      fontSize:
+                                                                          subFontSize,
+                                                                  },
+                                                              ]}
+                                                          >
+                                                              Pièces
+                                                          </Text>
+                                                          <Text
+                                                              style={[
+                                                                  styles.cornerSub,
+                                                                  {
+                                                                      fontSize:
+                                                                          subFontSize,
+                                                                  },
+                                                              ]}
+                                                          >
+                                                              {panel.stats
+                                                                  ?.pieces ?? 0}
+                                                          </Text>
+                                                      </View>
+                                                      <View
+                                                          style={
+                                                              styles.cornerRow
+                                                          }
+                                                      >
+                                                          <Text
+                                                              style={[
+                                                                  styles.cornerSub,
+                                                                  {
+                                                                      fontSize:
+                                                                          subFontSize,
+                                                                  },
+                                                              ]}
+                                                          >
+                                                              Prises
+                                                          </Text>
+                                                          <Text
+                                                              style={[
+                                                                  styles.cornerSub,
+                                                                  {
+                                                                      fontSize:
+                                                                          subFontSize,
+                                                                  },
+                                                              ]}
+                                                          >
+                                                              {panel.stats
+                                                                  ?.captures ??
+                                                                  0}
+                                                          </Text>
+                                                      </View>
+                                                  </View>
+                                              </View>
+                                          ))
                                         : null}
                                 </View>
                             </View>
@@ -2085,7 +2467,10 @@ export default function App() {
                                 <View
                                     style={[
                                         styles.mobilePlayerPanelsRow,
-                                        { marginTop: lineSpacing, gap: lineSpacing },
+                                        {
+                                            marginTop: lineSpacing,
+                                            gap: lineSpacing,
+                                        },
                                     ]}
                                 >
                                     {playerPanels.map((panel) => (
@@ -2096,16 +2481,23 @@ export default function App() {
                                                 styles.mobilePlayerPanel,
                                                 {
                                                     borderRadius: panelRadius,
-                                                    paddingHorizontal: panelHorizontalPadding,
-                                                    paddingVertical: panelVerticalPadding,
+                                                    paddingHorizontal:
+                                                        panelHorizontalPadding,
+                                                    paddingVertical:
+                                                        panelVerticalPadding,
                                                 },
                                             ]}
                                         >
-                                            <View style={styles.cornerTextStack}>
+                                            <View
+                                                style={styles.cornerTextStack}
+                                            >
                                                 <Text
                                                     style={[
                                                         styles.cornerTitle,
-                                                        { fontSize: titleFontSize },
+                                                        {
+                                                            fontSize:
+                                                                titleFontSize,
+                                                        },
                                                     ]}
                                                 >
                                                     {panel.label}
@@ -2113,13 +2505,26 @@ export default function App() {
                                                 <View
                                                     style={[
                                                         styles.playerStatusBadge,
-                                                        isPanelActiveTurn(panel.key)
+                                                        isPanelActiveTurn(
+                                                            panel.key,
+                                                        )
                                                             ? styles.playerStatusBadgeActive
                                                             : null,
                                                         {
-                                                            borderColor: getPanelStatusTone(panel.key),
-                                                            backgroundColor: getPanelStatusBackground(panel.key),
-                                                            borderWidth: isPanelActiveTurn(panel.key) ? 3 : 2,
+                                                            borderColor:
+                                                                getPanelStatusTone(
+                                                                    panel.key,
+                                                                ),
+                                                            backgroundColor:
+                                                                getPanelStatusBackground(
+                                                                    panel.key,
+                                                                ),
+                                                            borderWidth:
+                                                                isPanelActiveTurn(
+                                                                    panel.key,
+                                                                )
+                                                                    ? 3
+                                                                    : 2,
                                                         },
                                                     ]}
                                                 >
@@ -2127,30 +2532,45 @@ export default function App() {
                                                         style={[
                                                             styles.playerStatusText,
                                                             {
-                                                                fontSize: subFontSize,
-                                                                color: getPanelStatusTextColor(panel.key),
+                                                                fontSize:
+                                                                    subFontSize,
+                                                                color: getPanelStatusTextColor(
+                                                                    panel.key,
+                                                                ),
                                                             },
                                                         ]}
                                                     >
-                                                        {getPanelStatusLabel(panel.key)}
+                                                        {getPanelStatusLabel(
+                                                            panel.key,
+                                                        )}
                                                     </Text>
                                                 </View>
                                                 <View style={styles.cornerRow}>
                                                     <Text
                                                         style={[
                                                             styles.cornerSub,
-                                                            { fontSize: subFontSize },
+                                                            {
+                                                                fontSize:
+                                                                    subFontSize,
+                                                            },
                                                         ]}
                                                     >
-                                                        P: {panel.stats?.pieces ?? 0}
+                                                        P:{" "}
+                                                        {panel.stats?.pieces ??
+                                                            0}
                                                     </Text>
                                                     <Text
                                                         style={[
                                                             styles.cornerSub,
-                                                            { fontSize: subFontSize },
+                                                            {
+                                                                fontSize:
+                                                                    subFontSize,
+                                                            },
                                                         ]}
                                                     >
-                                                        C: {panel.stats?.captures ?? 0}
+                                                        C:{" "}
+                                                        {panel.stats
+                                                            ?.captures ?? 0}
                                                     </Text>
                                                 </View>
                                             </View>
@@ -2180,13 +2600,17 @@ export default function App() {
                                             )
                                         }
                                     >
-                                        <Text style={styles.mobileZoomText}>-</Text>
+                                        <Text style={styles.mobileZoomText}>
+                                            -
+                                        </Text>
                                     </Pressable>
                                     <Pressable
                                         style={styles.mobileZoomValue}
                                         onPress={resetBoardCamera}
                                     >
-                                        <Text style={styles.mobileZoomValueText}>
+                                        <Text
+                                            style={styles.mobileZoomValueText}
+                                        >
                                             {zoomPercent}%
                                         </Text>
                                     </Pressable>
@@ -2202,31 +2626,15 @@ export default function App() {
                                             )
                                         }
                                     >
-                                        <Text style={styles.mobileZoomText}>+</Text>
+                                        <Text style={styles.mobileZoomText}>
+                                            +
+                                        </Text>
                                     </Pressable>
                                 </View>
                             ) : null}
                         </>
-                    ) : (
-                        <View
-                            style={[
-                                styles.boardIdleState,
-                                {
-                                    width: boardSize,
-                                    height: boardSize,
-                                    borderRadius: panelRadius,
-                                },
-                            ]}
-                        >
-                            <Text style={[styles.boardIdleTitle, { fontSize: valueFontSize }]}>
-                                Aucune partie en cours
-                            </Text>
-                            <Text style={[styles.boardIdleSub, { fontSize: subFontSize }]}>
-                                Lance une partie depuis le menu pour afficher l echiquier.
-                            </Text>
-                        </View>
-                    )}
-                </View>
+                    </View>
+                ) : null}
             </View>
         </SafeAreaView>
     );
@@ -2253,6 +2661,38 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: "rgba(148, 163, 184, 0.22)",
     },
+    menuFlow: {
+        flex: 1,
+        justifyContent: "space-between",
+    },
+    menuFormBlock: {
+        flex: 1,
+        flexShrink: 1,
+    },
+    menuSection: {
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: "rgba(148, 163, 184, 0.12)",
+    },
+    menuTypeSection: {
+        marginTop: 20,
+    },
+    menuSectionLabel: {
+        color: "#e2e8f0",
+        fontWeight: "700",
+        letterSpacing: 0.2,
+    },
+    menuOptionsSection: {
+        flex: 1,
+        justifyContent: "center",
+        borderBottomWidth: 0,
+        paddingBottom: 0,
+    },
+    menuActionsBlock: {
+        borderTopWidth: 1,
+        borderTopColor: "rgba(148, 163, 184, 0.16)",
+        paddingTop: 12,
+    },
     stage: {
         flex: 1,
         position: "relative",
@@ -2261,25 +2701,6 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: "center",
         justifyContent: "center",
-    },
-    boardIdleState: {
-        alignSelf: "center",
-        alignItems: "center",
-        justifyContent: "center",
-        paddingHorizontal: 24,
-        backgroundColor: "rgba(15, 23, 42, 0.62)",
-        borderWidth: 1,
-        borderColor: "rgba(148, 163, 184, 0.3)",
-    },
-    boardIdleTitle: {
-        color: "#f8fafc",
-        fontWeight: "700",
-        textAlign: "center",
-    },
-    boardIdleSub: {
-        marginTop: 8,
-        color: "#cbd5e1",
-        textAlign: "center",
     },
     cornerPanel: {
         flex: 1,
