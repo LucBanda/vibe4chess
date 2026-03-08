@@ -1893,12 +1893,14 @@ export default function App() {
                                                                         ],
                                                                         fontSize: pieceFontSize,
                                                                         textShadowColor:
-                                                                            "rgba(0, 0, 0, 0.45)",
+                                                                            piece.player === "black"
+                                                                                ? "rgba(255, 255, 255, 0.95)"
+                                                                                : "rgba(0, 0, 0, 0.85)",
                                                                         textShadowOffset: {
                                                                             width: 0,
                                                                             height: 1,
                                                                         },
-                                                                        textShadowRadius: 1,
+                                                                        textShadowRadius: 2,
                                                                     },
                                                                 ]}
                                                             >
