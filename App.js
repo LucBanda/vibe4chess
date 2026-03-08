@@ -52,28 +52,15 @@ import {
     setActiveLocalUsername,
 } from "./src/lib/localSession.js";
 
-const LIGHT_PIECE_SYMBOL = {
-    king: "♔",
-    queen: "♕",
-    rook: "♖",
-    bishop: "♗",
-    knight: "♘",
-    pawn: "♙",
+const PIECE_BADGE_COLOR = {
+    white: "#e2e8f0",
+    red: "#ef4444",
+    black: "#4b5563",
+    blue: "#3b82f6",
 };
 
 function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
-}
-
-function symbolForPiece(piece) {
-    if (!piece) {
-        return "";
-    }
-    // Expo Go iOS may render black-symbol glyphs in fixed black; use light glyphs for non-black teams.
-    if (piece.player === "black") {
-        return PIECE_SYMBOL[piece.type] ?? "";
-    }
-    return LIGHT_PIECE_SYMBOL[piece.type] ?? PIECE_SYMBOL[piece.type] ?? "";
 }
 
 export default function App() {
@@ -137,7 +124,8 @@ export default function App() {
     const valueFontSize = clamp(Math.floor(shortSide * 0.032), 14, 21);
     const subFontSize = clamp(Math.floor(shortSide * 0.022), 11, 15);
     const buttonFontSize = clamp(Math.floor(menuShortSide * 0.1), 10, 14);
-    const pieceFontSize = clamp(Math.floor(squareSize * 0.72), 12, 40);
+    const pieceFontSize = clamp(Math.floor(squareSize * 0.58), 10, 32);
+    const pieceBadgeSize = clamp(Math.floor(squareSize * 0.74), 14, 46);
 
     const resetButtonVerticalPadding = clamp(
         Math.floor(menuShortSide * 0.06),
@@ -1562,26 +1550,38 @@ export default function App() {
                                                     }}
                                                 >
                                                     {piece ? (
-                                                        <Text
+                                                        <View
                                                             style={[
-                                                                styles.piece,
+                                                                styles.pieceBadge,
                                                                 {
-                                                                    color: PLAYER_COLOR[
-                                                                        piece.player
-                                                                    ],
-                                                                    fontSize: pieceFontSize,
-                                                                    textShadowColor:
-                                                                        "rgba(0, 0, 0, 0.65)",
-                                                                    textShadowOffset: {
-                                                                        width: 0,
-                                                                        height: 1,
-                                                                    },
-                                                                    textShadowRadius: 2,
+                                                                    width: pieceBadgeSize,
+                                                                    height: pieceBadgeSize,
+                                                                    borderRadius: Math.floor(
+                                                                        pieceBadgeSize / 2,
+                                                                    ),
+                                                                    backgroundColor:
+                                                                        PIECE_BADGE_COLOR[
+                                                                            piece.player
+                                                                        ] ??
+                                                                        PLAYER_COLOR[piece.player],
                                                                 },
                                                             ]}
                                                         >
-                                                            {symbolForPiece(piece)}
-                                                        </Text>
+                                                            <Text
+                                                                style={[
+                                                                    styles.piece,
+                                                                    {
+                                                                        color:
+                                                                            piece.player === "white"
+                                                                                ? "#0f172a"
+                                                                                : "#f8fafc",
+                                                                        fontSize: pieceFontSize,
+                                                                    },
+                                                                ]}
+                                                            >
+                                                                {PIECE_SYMBOL[piece.type]}
+                                                            </Text>
+                                                        </View>
                                                     ) : null}
                                                 </Pressable>
                                             );
@@ -1784,6 +1784,12 @@ const styles = StyleSheet.create({
     },
     piece: {
         fontWeight: "700",
+    },
+    pieceBadge: {
+        alignItems: "center",
+        justifyContent: "center",
+        borderWidth: 1,
+        borderColor: "rgba(15, 23, 42, 0.75)",
     },
     cornerTextStack: {
         flexDirection: "column",
