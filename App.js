@@ -472,23 +472,8 @@ export default function App() {
         if (!isInGame) {
             return;
         }
-        if (playMode !== "local" && moveCount === 0) {
-            const missingSeats = PLAYERS.filter((color) => !remotePlayerIds[color]);
-            if (missingSeats.length > 0) {
-                const nextPlayerIds = { ...remotePlayerIds };
-                for (const color of missingSeats) {
-                    nextPlayerIds[color] = "robot";
-                }
-                setRemotePlayerIds(nextPlayerIds);
-                setControlByColor((previous) => {
-                    const next = { ...previous };
-                    for (const color of missingSeats) {
-                        next[color] = "robot";
-                    }
-                    return next;
-                });
-                setWaitingPlayersMessage(null);
-            }
+        if (playMode !== "local" && waitingPlayersMessage) {
+            return;
         }
         const zoomedOrPanned =
             boardZoomRef.current > 1 ||
@@ -1126,6 +1111,9 @@ export default function App() {
         if (!isInGame || winner || controlByColor[turn] !== "robot") {
             return undefined;
         }
+        if (playMode !== "local" && waitingPlayersMessage) {
+            return undefined;
+        }
 
         const timerId = setTimeout(() => {
             const botMove = chooseRobotMove({
@@ -1182,7 +1170,17 @@ export default function App() {
         }, 500);
 
         return () => clearTimeout(timerId);
-    }, [isInGame, board, turn, moveCount, capturesBy, winner, controlByColor]);
+    }, [
+        isInGame,
+        board,
+        turn,
+        moveCount,
+        capturesBy,
+        winner,
+        controlByColor,
+        playMode,
+        waitingPlayersMessage,
+    ]);
 
     useEffect(() => {
         setBoardPan((previous) => ({
@@ -1311,7 +1309,7 @@ export default function App() {
             if (missingSeats.length > 0) {
                 if (!cancelled) {
                     setWaitingPlayersMessage(
-                        `En attente de joueurs: ${4 - missingSeats.length}/4 sièges occupés`,
+                        `Partie en pause: ${4 - missingSeats.length}/4 sièges occupés`,
                     );
                 }
                 return;
@@ -1356,7 +1354,7 @@ export default function App() {
 
             if (disconnectedPlayers.length > 0) {
                 setWaitingPlayersMessage(
-                    `En attente de joueurs: ${disconnectedPlayers.join(", ")}`,
+                    `Partie en pause: reconnexion de ${disconnectedPlayers.join(", ")}`,
                 );
                 return;
             }
@@ -1802,6 +1800,19 @@ export default function App() {
                                             <Text style={styles.resetText}>⏹ Quitter</Text>
                                         </Pressable>
                                     </View>
+                                    {canUseRemote ? (
+                                        <Text
+                                            style={[
+                                                styles.remoteStatusText,
+                                                waitingPlayersMessage
+                                                    ? styles.remoteStatusWarning
+                                                    : null,
+                                            ]}
+                                        >
+                                            {waitingPlayersMessage ??
+                                                "Statut remote: tous les joueurs sont connectés"}
+                                        </Text>
+                                    ) : null}
                                 </View>
                             </>
                         )}
@@ -2332,6 +2343,15 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         paddingVertical: 7,
         paddingHorizontal: 9,
+    },
+    remoteStatusText: {
+        color: "#93c5fd",
+        fontSize: 12,
+        lineHeight: 16,
+    },
+    remoteStatusWarning: {
+        color: "#fca5a5",
+        fontWeight: "700",
     },
     usernameInput: {
         backgroundColor: "#1f2937",
