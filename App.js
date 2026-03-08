@@ -595,6 +595,36 @@ export default function App() {
     const redStats = stats.find((s) => s.player === "red");
     const blackStats = stats.find((s) => s.player === "black");
     const blueStats = stats.find((s) => s.player === "blue");
+    const playerPanels = [
+        {
+            key: "black",
+            label: "Noir",
+            stats: blackStats,
+            top: stageGap,
+            left: stageGap,
+        },
+        {
+            key: "white",
+            label: "Blanc",
+            stats: whiteStats,
+            top: stageGap,
+            right: stageGap,
+        },
+        {
+            key: "red",
+            label: "Rouge",
+            stats: redStats,
+            bottom: stageGap,
+            left: stageGap,
+        },
+        {
+            key: "blue",
+            label: "Bleu",
+            stats: blueStats,
+            bottom: stageGap,
+            right: stageGap,
+        },
+    ];
     const selectedJoinGame =
         joinableGames.find((game) => game.id === selectedJoinGameId) ?? null;
     const selectedJoinGameFreeSeats = freeSeatsOf(selectedJoinGame?.player_ids);
@@ -1881,36 +1911,8 @@ export default function App() {
                                         )}
                                     </View>
 
-                                    {[
-                                        {
-                                            key: "black",
-                                            label: "Noir",
-                                            stats: blackStats,
-                                            top: stageGap,
-                                            left: stageGap,
-                                        },
-                                        {
-                                            key: "white",
-                                            label: "Blanc",
-                                            stats: whiteStats,
-                                            top: stageGap,
-                                            right: stageGap,
-                                        },
-                                        {
-                                            key: "red",
-                                            label: "Rouge",
-                                            stats: redStats,
-                                            bottom: stageGap,
-                                            left: stageGap,
-                                        },
-                                        {
-                                            key: "blue",
-                                            label: "Bleu",
-                                            stats: blueStats,
-                                            bottom: stageGap,
-                                            right: stageGap,
-                                        },
-                                    ].map((panel) => (
+                                    {!isSmallScreen
+                                        ? playerPanels.map((panel) => (
                                         <View
                                             key={panel.key}
                                             style={[
@@ -1991,9 +1993,78 @@ export default function App() {
                                                 </View>
                                             </View>
                                         </View>
-                                    ))}
+                                    ))
+                                        : null}
                                 </View>
                             </View>
+                            {isSmallScreen ? (
+                                <View
+                                    style={[
+                                        styles.mobilePlayerPanelsRow,
+                                        { marginTop: lineSpacing, gap: lineSpacing },
+                                    ]}
+                                >
+                                    {playerPanels.map((panel) => (
+                                        <View
+                                            key={`mobile-${panel.key}`}
+                                            style={[
+                                                styles.cornerPanel,
+                                                styles.mobilePlayerPanel,
+                                                {
+                                                    borderRadius: panelRadius,
+                                                    paddingHorizontal: panelHorizontalPadding,
+                                                    paddingVertical: panelVerticalPadding,
+                                                },
+                                            ]}
+                                        >
+                                            <View style={styles.cornerTextStack}>
+                                                <Text
+                                                    style={[
+                                                        styles.cornerTitle,
+                                                        { fontSize: titleFontSize },
+                                                    ]}
+                                                >
+                                                    {panel.label}
+                                                </Text>
+                                                <Text
+                                                    style={[
+                                                        styles.cornerSub,
+                                                        { fontSize: subFontSize },
+                                                    ]}
+                                                >
+                                                    {playMode === "local"
+                                                        ? controlByColor[panel.key] === "robot"
+                                                            ? "Robot"
+                                                            : panel.key === localPlayerColor
+                                                                ? normalizedPlayerUsername
+                                                                : "Humain"
+                                                        : remotePlayerIds[panel.key] === "robot"
+                                                            ? "Robot"
+                                                            : remotePlayerIds[panel.key] ?? "Libre"}
+                                                </Text>
+                                                <View style={styles.cornerRow}>
+                                                    <Text
+                                                        style={[
+                                                            styles.cornerSub,
+                                                            { fontSize: subFontSize },
+                                                        ]}
+                                                    >
+                                                        P: {panel.stats?.pieces ?? 0}
+                                                    </Text>
+                                                    <Text
+                                                        style={[
+                                                            styles.cornerSub,
+                                                            { fontSize: subFontSize },
+                                                        ]}
+                                                    >
+                                                        C: {panel.stats?.captures ?? 0}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                        </View>
+                                    ))}
+                                </View>
+                            ) : null}
                             {isSmallScreen ? (
                                 <View
                                     style={[
@@ -2120,6 +2191,16 @@ const styles = StyleSheet.create({
         position: "absolute",
         flex: 0,
         zIndex: 2,
+    },
+    mobilePlayerPanelsRow: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        paddingHorizontal: 2,
+    },
+    mobilePlayerPanel: {
+        width: "48.5%",
+        flex: 0,
+        minHeight: 0,
     },
     board: {
         flexDirection: "row",
