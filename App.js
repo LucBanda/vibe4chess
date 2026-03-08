@@ -30,6 +30,7 @@ import {
 import { chooseRobotMove } from "./src/game/bot.js";
 import { applyMove, createCapturesBy } from "./src/game/engine.js";
 import { isLegalMove } from "./src/game/rules.js";
+import { createGameSnapshot } from "./src/game/stateSnapshot.js";
 import { computeStats } from "./src/game/stats.js";
 import {
     colorOfPlayer,
@@ -197,6 +198,10 @@ export default function App() {
     );
     const alivePlayers = stats.filter((s) => s.alive).map((s) => s.player);
     const winner = alivePlayers.length === 1 ? alivePlayers[0] : null;
+    const currentGameState = useMemo(
+        () => createGameSnapshot({ board, turn, moveCount, capturesBy, winner }),
+        [board, turn, moveCount, capturesBy, winner],
+    );
     const playerColorLabel = PLAYER_LABEL[localPlayerColor] ?? "Inconnue";
     const canResumeRemoteGame = Boolean(pendingRemoteResume) && !isInGame;
 
@@ -512,13 +517,7 @@ export default function App() {
         }
 
         const result = applyMove(
-            {
-                board,
-                turn,
-                moveCount,
-                capturesBy,
-                winner,
-            },
+            currentGameState,
             selected.x,
             selected.y,
             x,
@@ -896,13 +895,7 @@ export default function App() {
             return;
         }
         try {
-            await syncRemoteGame(remoteGameId, {
-                board,
-                turn,
-                moveCount,
-                capturesBy,
-                winner,
-            });
+            await syncRemoteGame(remoteGameId, currentGameState);
             setSyncMessage("Remote: synchronisation réussie");
         } catch (error) {
             Alert.alert("Supabase", error.message);
@@ -1134,13 +1127,7 @@ export default function App() {
         }
 
         const timerId = setTimeout(() => {
-            const botMove = chooseRobotMove({
-                board,
-                turn,
-                moveCount,
-                capturesBy,
-                winner,
-            });
+            const botMove = chooseRobotMove(currentGameState);
 
             if (!botMove) {
                 setSyncMessage(
@@ -1150,13 +1137,7 @@ export default function App() {
             }
 
             const result = applyMove(
-                {
-                    board,
-                    turn,
-                    moveCount,
-                    capturesBy,
-                    winner,
-                },
+                currentGameState,
                 botMove.fromX,
                 botMove.fromY,
                 botMove.toX,
