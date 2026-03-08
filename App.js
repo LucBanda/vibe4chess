@@ -47,7 +47,6 @@ import {
 import { normalizeUsername } from "./src/lib/username.js";
 import { setTabUsername } from "./src/lib/tabUsername.js";
 import {
-    clearLocalSession,
     loadLocalSession,
     saveLocalSession,
     setActiveLocalUsername,
@@ -87,6 +86,7 @@ export default function App() {
     const [remoteUpdatedAt, setRemoteUpdatedAt] = useState(null);
     const remoteUpdatedAtRef = useRef(null);
     const hasAutoResumedLocalRef = useRef(false);
+    const skipAutoResumeAfterQuitRef = useRef(false);
     const [controlByColor, setControlByColor] = useState({
         white: "human",
         red: "human",
@@ -757,7 +757,6 @@ export default function App() {
     };
 
     const onQuitGame = async () => {
-        const username = normalizeUsername(playerUsername, "");
         if (remoteGameId && isRemoteOwner) {
             try {
                 await deleteRemoteGame(remoteGameId);
@@ -767,13 +766,8 @@ export default function App() {
             }
         }
 
-        if (playMode === "local" && username) {
-            try {
-                await clearLocalSession(username);
-                setHasSavedLocalGame(false);
-            } catch (error) {
-                console.error("Local session cleanup failed", error);
-            }
+        if (playMode === "local") {
+            skipAutoResumeAfterQuitRef.current = true;
         }
 
         resetToNoGame();
@@ -910,6 +904,10 @@ export default function App() {
             setHasSavedLocalGame(hasSnapshot);
 
             if (!hasSnapshot || hasAutoResumedLocalRef.current) {
+                return;
+            }
+            if (skipAutoResumeAfterQuitRef.current) {
+                skipAutoResumeAfterQuitRef.current = false;
                 return;
             }
 
