@@ -60,3 +60,23 @@ test("chooseRobotMove is deterministic for a given state", () => {
   const second = chooseRobotMove(state);
   assert.deepEqual(first, second);
 });
+
+test("chooseRobotMove prioritizes pressuring the leading opponent in 4-player mode", () => {
+  const state = makeState({
+    [keyOf(6, 6)]: { player: "white", type: "king" },
+    [keyOf(6, 5)]: { player: "white", type: "queen" },
+    [keyOf(6, 2)]: { player: "red", type: "rook" },
+    [keyOf(8, 5)]: { player: "blue", type: "rook" },
+    [keyOf(9, 2)]: { player: "red", type: "queen" },
+    [keyOf(1, 1)]: { player: "black", type: "king" },
+    [keyOf(12, 12)]: { player: "red", type: "king" },
+    [keyOf(10, 10)]: { player: "blue", type: "king" },
+  });
+
+  const move = chooseRobotMove(state);
+  assert.ok(move);
+  assert.deepEqual(
+    { fromX: move.fromX, fromY: move.fromY, toX: move.toX, toY: move.toY },
+    { fromX: 6, fromY: 5, toX: 6, toY: 2 },
+  );
+});
