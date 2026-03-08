@@ -1,5 +1,9 @@
 # Expo Chess (iOS / Android / Web + Supabase)
 
+## Genèse du projet (vibe codé)
+
+Ce projet a été construit en mode "vibe codé": itérations courtes guidées par le besoin produit, implémentation directe dans le code, tests fréquents (`npm test`) et ajustements continus à partir des retours d'usage. L'objectif est de privilégier la vitesse d'expérimentation, puis de stabiliser par des règles explicites, des garde-fous et des commits incrémentaux.
+
 ## Démarrage
 
 ```bash
