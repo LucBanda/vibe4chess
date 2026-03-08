@@ -846,6 +846,12 @@ export default function App() {
             return;
         }
         setPlayMode(nextMode);
+        if (nextMode === "create") {
+            setControlByColor((previous) => ({
+                ...previous,
+                white: "human",
+            }));
+        }
         setSyncMessage(nextMode === "local" ? "Mode local" : "Remote: non synchronisé");
     };
 
@@ -945,6 +951,8 @@ export default function App() {
         joinableGames.find((game) => game.id === selectedJoinGameId) ?? null;
     const selectedJoinGameFreeSeats = freeSeatsOf(selectedJoinGame?.player_ids);
     const canUseRemote = isInGame && playMode !== "local";
+    const remoteModesDisabled = !supabaseConfigured;
+    const canRefreshJoinables = supabaseConfigured && !loadingJoinableGames;
     const turnControlMode =
         playMode === "local"
             ? controlByColor[turn]
@@ -1503,8 +1511,12 @@ export default function App() {
                                             playMode === "create"
                                                 ? styles.visibilityButtonActive
                                                 : null,
+                                            remoteModesDisabled
+                                                ? styles.visibilityButtonDisabled
+                                                : null,
                                         ]}
                                         onPress={() => selectPlayMode("create")}
+                                        disabled={remoteModesDisabled}
                                     >
                                         <Text style={styles.visibilityText}>
                                             {isSmallScreen ? "＋ Créer" : "Créer remote"}
@@ -1516,8 +1528,12 @@ export default function App() {
                                             playMode === "join"
                                                 ? styles.visibilityButtonActive
                                                 : null,
+                                            remoteModesDisabled
+                                                ? styles.visibilityButtonDisabled
+                                                : null,
                                         ]}
                                         onPress={() => selectPlayMode("join")}
+                                        disabled={remoteModesDisabled}
                                     >
                                         <Text style={styles.visibilityText}>
                                             {isSmallScreen ? "↔ Rejoindre" : "Rejoindre remote"}
@@ -1571,9 +1587,23 @@ export default function App() {
                                                             controlByColor[color] === "robot"
                                                                 ? styles.controlButtonActive
                                                                 : null,
+                                                            playMode === "create" &&
+                                                            color === "white"
+                                                                ? styles.controlButtonDisabled
+                                                                : null,
                                                         ]}
-                                                        onPress={() =>
-                                                            setPlayerControl(color, "robot")
+                                                        onPress={() => {
+                                                            if (
+                                                                playMode === "create" &&
+                                                                color === "white"
+                                                            ) {
+                                                                return;
+                                                            }
+                                                            setPlayerControl(color, "robot");
+                                                        }}
+                                                        disabled={
+                                                            playMode === "create" &&
+                                                            color === "white"
                                                         }
                                                     >
                                                         <Text style={styles.controlButtonText}>
@@ -1613,10 +1643,16 @@ export default function App() {
                                                             selectedJoinGameId === game.id
                                                                 ? styles.visibilityButtonActive
                                                                 : null,
+                                                            !supabaseConfigured
+                                                                ? styles.joinableGameButtonDisabled
+                                                                : null,
                                                         ]}
-                                                        onPress={() =>
-                                                            setSelectedJoinGameId(game.id)
-                                                        }
+                                                        onPress={() => {
+                                                            if (supabaseConfigured) {
+                                                                setSelectedJoinGameId(game.id);
+                                                            }
+                                                        }}
+                                                        disabled={!supabaseConfigured}
                                                     >
                                                         <Text style={styles.joinableGameTitle}>
                                                             {game.id.slice(0, 8)}...
@@ -1639,8 +1675,14 @@ export default function App() {
                                                 </Text>
                                             ) : null}
                                             <Pressable
-                                                style={styles.refreshJoinablesButton}
+                                                style={[
+                                                    styles.refreshJoinablesButton,
+                                                    !canRefreshJoinables
+                                                        ? styles.joinColorButtonDisabled
+                                                        : null,
+                                                ]}
                                                 onPress={loadJoinableGames}
+                                                disabled={!canRefreshJoinables}
                                             >
                                                 <Text style={styles.resetText}>
                                                     {loadingJoinableGames
@@ -1672,9 +1714,8 @@ export default function App() {
                                         >
                                             {PLAYERS.map((color) => {
                                                 const isSeatFree =
-                                                    selectedJoinGameFreeSeats.includes(
-                                                        color,
-                                                    );
+                                                    Boolean(selectedJoinGame) &&
+                                                    selectedJoinGameFreeSeats.includes(color);
                                                 return (
                                                     <Pressable
                                                         key={`join-${color}`}
@@ -1692,6 +1733,7 @@ export default function App() {
                                                                 setJoinColor(color);
                                                             }
                                                         }}
+                                                        disabled={!isSeatFree}
                                                     >
                                                         <Text style={styles.visibilityText}>
                                                             {PLAYER_LABEL[color]}
@@ -2391,6 +2433,9 @@ const styles = StyleSheet.create({
         backgroundColor: "#1d4ed8",
         borderColor: "#93c5fd",
     },
+    visibilityButtonDisabled: {
+        opacity: 0.45,
+    },
     visibilityText: {
         color: "#e5e7eb",
         textAlign: "center",
@@ -2422,6 +2467,9 @@ const styles = StyleSheet.create({
         borderRadius: 6,
         paddingHorizontal: 8,
         paddingVertical: 8,
+    },
+    joinableGameButtonDisabled: {
+        opacity: 0.45,
     },
     joinableGameTitle: {
         color: "#f8fafc",
@@ -2466,6 +2514,9 @@ const styles = StyleSheet.create({
     controlButtonActive: {
         backgroundColor: "#2563eb",
         borderColor: "#60a5fa",
+    },
+    controlButtonDisabled: {
+        opacity: 0.45,
     },
     controlButtonText: {
         color: "#e5e7eb",

@@ -74,6 +74,17 @@ test("normalizeCreateOptions never persists literal robot usernames", () => {
   });
 });
 
+test("normalizeCreateOptions keeps owner seat white as human", () => {
+  const options = normalizeCreateOptions("alice", {
+    robotSeats: ["white", "red"],
+  });
+
+  assert.deepEqual(options.player_ids, {
+    white: "alice",
+    red: "robot",
+  });
+});
+
 test("buildPlayerStatusPayload keeps in_game fields when valid", () => {
   const payload = buildPlayerStatusPayload({
     status: "in_game",

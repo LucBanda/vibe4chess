@@ -68,8 +68,12 @@ EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
 - Aide ergonomique: cases légales mises en évidence après sélection
 - Lisibilité: dernier coup mis en évidence (départ/arrivée)
 - Mobile: zoom du plateau (`+`/`-`) + glisser du plateau quand le zoom est > 100%
-- Reprise locale: auto-sauvegarde + restauration automatique + bouton de reprise
 - Layout adaptatif mobile/desktop
 - Création et synchronisation d'une partie distante dans Supabase (`chess_games`)
 - Mode client: créer une partie (avec options joueurs/robots) ou s'inscrire à une partie existante non pleine
-- Sélection `Humain/Robot` par couleur avec bot tactique amélioré
+- Sélection `Humain/Robot` par couleur:
+  - mode local: contrôle complet des 4 sièges
+  - mode remote: options robot appliquées à la création uniquement (pas d'ajout automatique)
+- Présence remote robuste:
+  - si l'owner quitte, la partie est supprimée et non reprenable
+  - si un invité se déconnecte, la partie est mise en pause en attente de reconnexion

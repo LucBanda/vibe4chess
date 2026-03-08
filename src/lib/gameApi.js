@@ -137,7 +137,7 @@ export function normalizeCreateOptions(username, options = {}) {
         }
     }
 
-    if (!playerIds.white) {
+    if (!playerIds.white || playerIds.white === "robot") {
         playerIds.white = normalizedUsername;
     }
 
