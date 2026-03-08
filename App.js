@@ -144,6 +144,7 @@ export default function App() {
     );
     const lineSpacing = clamp(Math.floor(shortSide * 0.006), 3, 8);
     const stageGap = clamp(Math.floor(shortSide * 0.012), 6, 14);
+    const useCompactInGameMenu = isSmallScreen && isInGame;
 
     const cells = useMemo(
         () => createPerspectiveCells(board, localPlayerColor),
@@ -1113,39 +1114,55 @@ export default function App() {
                                 ? `Gagnant: ${PLAYER_LABEL[winner]}`
                                 : PLAYER_LABEL[turn]}
                         </Text>
-                        <Text
-                            style={[
-                                styles.cornerSub,
-                                {
-                                    fontSize: subFontSize,
-                                    marginTop: lineSpacing,
-                                },
-                            ]}
-                        >
-                            Joueur: {normalizedPlayerUsername}
-                        </Text>
-                        <Text
-                            style={[
-                                styles.cornerSub,
-                                {
-                                    fontSize: subFontSize,
-                                    marginTop: lineSpacing,
-                                },
-                            ]}
-                        >
-                            Ma couleur: {playerColorLabel}
-                        </Text>
-                        <Text
-                            style={[
-                                styles.cornerSub,
-                                {
-                                    fontSize: subFontSize,
-                                    marginTop: lineSpacing,
-                                },
-                            ]}
-                        >
-                            Coups: {moveCount}
-                        </Text>
+                        {useCompactInGameMenu ? (
+                            <Text
+                                style={[
+                                    styles.cornerSub,
+                                    {
+                                        fontSize: subFontSize,
+                                        marginTop: lineSpacing,
+                                    },
+                                ]}
+                            >
+                                {normalizedPlayerUsername} | {playerColorLabel} | {moveCount} coups
+                            </Text>
+                        ) : (
+                            <>
+                                <Text
+                                    style={[
+                                        styles.cornerSub,
+                                        {
+                                            fontSize: subFontSize,
+                                            marginTop: lineSpacing,
+                                        },
+                                    ]}
+                                >
+                                    Joueur: {normalizedPlayerUsername}
+                                </Text>
+                                <Text
+                                    style={[
+                                        styles.cornerSub,
+                                        {
+                                            fontSize: subFontSize,
+                                            marginTop: lineSpacing,
+                                        },
+                                    ]}
+                                >
+                                    Ma couleur: {playerColorLabel}
+                                </Text>
+                                <Text
+                                    style={[
+                                        styles.cornerSub,
+                                        {
+                                            fontSize: subFontSize,
+                                            marginTop: lineSpacing,
+                                        },
+                                    ]}
+                                >
+                                    Coups: {moveCount}
+                                </Text>
+                            </>
+                        )}
                         {!isInGame ? (
                             <>
                                 <Text
@@ -1493,22 +1510,156 @@ export default function App() {
                                 </Pressable>
                             </>
                         ) : (
-                            <>
-                                <Text
+                            useCompactInGameMenu ? (
+                                <View
                                     style={[
-                                        styles.cornerSub,
-                                        {
-                                            fontSize: subFontSize,
-                                            marginTop: lineSpacing * 2,
-                                        },
+                                        styles.inGameCompactRow,
+                                        { marginTop: lineSpacing * 1.5, gap: lineSpacing },
                                     ]}
                                 >
-                                    Partie en cours ({playMode === "local" ? "locale" : "remote"})
-                                </Text>
-                                {canUseRemote ? (
+                                    <View style={styles.inGameCompactStatusCol}>
+                                        <Text style={[styles.cornerSub, { fontSize: subFontSize }]}>
+                                            Partie {playMode === "local" ? "locale" : "remote"}
+                                        </Text>
+                                        <Text
+                                            style={[
+                                                styles.cornerSub,
+                                                { fontSize: subFontSize, marginTop: lineSpacing },
+                                            ]}
+                                        >
+                                            {syncMessage}
+                                        </Text>
+                                        {waitingPlayersMessage ? (
+                                            <Text
+                                                style={[
+                                                    styles.cornerSub,
+                                                    {
+                                                        fontSize: subFontSize,
+                                                        marginTop: lineSpacing,
+                                                        color: "#fbbf24",
+                                                    },
+                                                ]}
+                                            >
+                                                {waitingPlayersMessage}
+                                            </Text>
+                                        ) : null}
+                                    </View>
+                                    <View style={styles.inGameCompactButtonsCol}>
+                                        {canUseRemote ? (
+                                            <Pressable
+                                                style={[
+                                                    styles.menuButtonSecondary,
+                                                    styles.inGameCompactButton,
+                                                    {
+                                                        paddingVertical: Math.max(
+                                                            5,
+                                                            resetButtonVerticalPadding - 2,
+                                                        ),
+                                                        paddingHorizontal: Math.max(
+                                                            8,
+                                                            resetButtonHorizontalPadding - 2,
+                                                        ),
+                                                        borderRadius: clamp(
+                                                            Math.floor(panelRadius * 0.65),
+                                                            5,
+                                                            9,
+                                                        ),
+                                                        opacity: supabaseConfigured ? 1 : 0.5,
+                                                    },
+                                                ]}
+                                                onPress={onSyncRemote}
+                                                disabled={!supabaseConfigured}
+                                            >
+                                                <Text
+                                                    style={[
+                                                        styles.resetText,
+                                                        { fontSize: buttonFontSize },
+                                                    ]}
+                                                >
+                                                    ⟳ Sync
+                                                </Text>
+                                            </Pressable>
+                                        ) : null}
+                                        <Pressable
+                                            style={[
+                                                styles.resetButton,
+                                                styles.inGameCompactButton,
+                                                {
+                                                    marginTop: lineSpacing,
+                                                    paddingVertical: Math.max(
+                                                        5,
+                                                        resetButtonVerticalPadding - 2,
+                                                    ),
+                                                    paddingHorizontal: Math.max(
+                                                        8,
+                                                        resetButtonHorizontalPadding - 2,
+                                                    ),
+                                                    borderRadius: clamp(
+                                                        Math.floor(panelRadius * 0.65),
+                                                        5,
+                                                        9,
+                                                    ),
+                                                },
+                                            ]}
+                                            onPress={onQuitGame}
+                                        >
+                                            <Text
+                                                style={[
+                                                    styles.resetText,
+                                                    { fontSize: buttonFontSize },
+                                                ]}
+                                            >
+                                                ⏹ Quitter
+                                            </Text>
+                                        </Pressable>
+                                    </View>
+                                </View>
+                            ) : (
+                                <>
+                                    <Text
+                                        style={[
+                                            styles.cornerSub,
+                                            {
+                                                fontSize: subFontSize,
+                                                marginTop: lineSpacing * 2,
+                                            },
+                                        ]}
+                                    >
+                                        Partie en cours ({playMode === "local" ? "locale" : "remote"})
+                                    </Text>
+                                    {canUseRemote ? (
+                                        <Pressable
+                                            style={[
+                                                styles.menuButtonSecondary,
+                                                {
+                                                    marginTop: lineSpacing,
+                                                    paddingVertical: resetButtonVerticalPadding,
+                                                    paddingHorizontal:
+                                                        resetButtonHorizontalPadding,
+                                                    borderRadius: clamp(
+                                                        Math.floor(panelRadius * 0.7),
+                                                        5,
+                                                        10,
+                                                    ),
+                                                    opacity: supabaseConfigured ? 1 : 0.5,
+                                                },
+                                            ]}
+                                            onPress={onSyncRemote}
+                                            disabled={!supabaseConfigured}
+                                        >
+                                            <Text
+                                                style={[
+                                                    styles.resetText,
+                                                    { fontSize: buttonFontSize },
+                                                ]}
+                                            >
+                                                {isSmallScreen ? "⟳ Sync" : "Synchroniser"}
+                                            </Text>
+                                        </Pressable>
+                                    ) : null}
                                     <Pressable
                                         style={[
-                                            styles.menuButtonSecondary,
+                                            styles.resetButton,
                                             {
                                                 marginTop: lineSpacing,
                                                 paddingVertical: resetButtonVerticalPadding,
@@ -1519,11 +1670,9 @@ export default function App() {
                                                     5,
                                                     10,
                                                 ),
-                                                opacity: supabaseConfigured ? 1 : 0.5,
                                             },
                                         ]}
-                                        onPress={onSyncRemote}
-                                        disabled={!supabaseConfigured}
+                                        onPress={onQuitGame}
                                     >
                                         <Text
                                             style={[
@@ -1531,51 +1680,27 @@ export default function App() {
                                                 { fontSize: buttonFontSize },
                                             ]}
                                         >
-                                            {isSmallScreen ? "⟳ Sync" : "Synchroniser"}
+                                            {isSmallScreen ? "⏹ Quitter" : "Quitter la partie"}
                                         </Text>
                                     </Pressable>
-                                ) : null}
-                                <Pressable
-                                    style={[
-                                        styles.resetButton,
-                                        {
-                                            marginTop: lineSpacing,
-                                            paddingVertical: resetButtonVerticalPadding,
-                                            paddingHorizontal:
-                                                resetButtonHorizontalPadding,
-                                            borderRadius: clamp(
-                                                Math.floor(panelRadius * 0.7),
-                                                5,
-                                                10,
-                                            ),
-                                        },
-                                    ]}
-                                    onPress={onQuitGame}
-                                >
-                                        <Text
-                                            style={[
-                                                styles.resetText,
-                                                { fontSize: buttonFontSize },
-                                            ]}
-                                        >
-                                        {isSmallScreen ? "⏹ Quitter" : "Quitter la partie"}
-                                    </Text>
-                                </Pressable>
-                            </>
+                                </>
+                            )
                         )}
 
-                        <Text
-                            style={[
-                                styles.cornerSub,
-                                {
-                                    fontSize: subFontSize,
-                                    marginTop: lineSpacing * 2,
-                                },
-                            ]}
-                        >
-                            {syncMessage}
-                        </Text>
-                        {waitingPlayersMessage ? (
+                        {!useCompactInGameMenu ? (
+                            <Text
+                                style={[
+                                    styles.cornerSub,
+                                    {
+                                        fontSize: subFontSize,
+                                        marginTop: lineSpacing * 2,
+                                    },
+                                ]}
+                            >
+                                {syncMessage}
+                            </Text>
+                        ) : null}
+                        {!useCompactInGameMenu && waitingPlayersMessage ? (
                             <Text
                                 style={[
                                     styles.cornerSub,
@@ -1589,17 +1714,19 @@ export default function App() {
                                 {waitingPlayersMessage}
                             </Text>
                         ) : null}
-                        <Text
-                            style={[
-                                styles.cornerSub,
-                                {
-                                    fontSize: subFontSize,
-                                    marginTop: lineSpacing,
-                                },
-                            ]}
-                        >
-                            Game ID: {remoteGameId ?? "aucun"}
-                        </Text>
+                        {!useCompactInGameMenu ? (
+                            <Text
+                                style={[
+                                    styles.cornerSub,
+                                    {
+                                        fontSize: subFontSize,
+                                        marginTop: lineSpacing,
+                                    },
+                                ]}
+                            >
+                                Game ID: {remoteGameId ?? "aucun"}
+                            </Text>
+                        ) : null}
                         {!supabaseConfigured ? (
                             <Text
                                 style={[
@@ -1974,6 +2101,21 @@ const styles = StyleSheet.create({
     },
     visibilityRow: {
         flexDirection: "row",
+    },
+    inGameCompactRow: {
+        flexDirection: "row",
+        alignItems: "flex-start",
+    },
+    inGameCompactStatusCol: {
+        flex: 1,
+        minWidth: 0,
+    },
+    inGameCompactButtonsCol: {
+        width: 120,
+        alignItems: "stretch",
+    },
+    inGameCompactButton: {
+        minHeight: 0,
     },
     usernameInput: {
         backgroundColor: "#1f2937",
