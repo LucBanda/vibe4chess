@@ -2,6 +2,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
     Alert,
+    PanResponder,
     Pressable,
     SafeAreaView,
     StyleSheet,
@@ -92,6 +93,8 @@ export default function App() {
     });
     const [playerUsername, setPlayerUsername] = useState(() => getTabUsername());
     const [boardZoom, setBoardZoom] = useState(1);
+    const [boardPan, setBoardPan] = useState({ x: 0, y: 0 });
+    const boardPanRef = useRef({ x: 0, y: 0 });
     const normalizedPlayerUsername = normalizeUsername(playerUsername, "player");
 
     const isCompactLayout = width < 980;
@@ -139,10 +142,38 @@ export default function App() {
     const stageGap = clamp(Math.floor(shortSide * 0.012), 6, 14);
     const useCompactInGameMenu = isSmallScreen && isInGame;
     const zoomPercent = Math.round(boardZoom * 100);
+    const maxBoardPan = Math.max(0, Math.floor(((boardSize * boardZoom) - boardSize) / 2));
+    const clampPanValue = (value) => clamp(value, -maxBoardPan, maxBoardPan);
 
     const cells = useMemo(
         () => createPerspectiveCells(board, localPlayerColor),
         [board, localPlayerColor],
+    );
+
+    const boardPanResponder = useMemo(
+        () =>
+            PanResponder.create({
+                onStartShouldSetPanResponder: () =>
+                    isSmallScreen && isInGame && boardZoom > 1,
+                onMoveShouldSetPanResponder: (_, gestureState) =>
+                    isSmallScreen &&
+                    isInGame &&
+                    boardZoom > 1 &&
+                    (Math.abs(gestureState.dx) > 2 || Math.abs(gestureState.dy) > 2),
+                onPanResponderMove: (_, gestureState) => {
+                    setBoardPan({
+                        x: clampPanValue(boardPanRef.current.x + gestureState.dx),
+                        y: clampPanValue(boardPanRef.current.y + gestureState.dy),
+                    });
+                },
+                onPanResponderRelease: () => {
+                    boardPanRef.current = boardPan;
+                },
+                onPanResponderTerminate: () => {
+                    boardPanRef.current = boardPan;
+                },
+            }),
+        [boardPan, boardZoom, isInGame, isSmallScreen, maxBoardPan],
     );
     const legalTargets = useMemo(() => {
         if (!selected) {
@@ -178,6 +209,10 @@ export default function App() {
     useEffect(() => {
         remoteUpdatedAtRef.current = remoteUpdatedAt;
     }, [remoteUpdatedAt]);
+
+    useEffect(() => {
+        boardPanRef.current = boardPan;
+    }, [boardPan]);
 
     const persistPlayerPresence = async ({
         username = playerUsername,
@@ -887,6 +922,13 @@ export default function App() {
     }, [isInGame, board, turn, moveCount, capturesBy, winner, controlByColor]);
 
     useEffect(() => {
+        setBoardPan((previous) => ({
+            x: clampPanValue(previous.x),
+            y: clampPanValue(previous.y),
+        }));
+    }, [boardZoom, boardSize, maxBoardPan]);
+
+    useEffect(() => {
         if (isInGame || playMode !== "join" || !supabaseConfigured) {
             return undefined;
         }
@@ -1097,7 +1139,9 @@ export default function App() {
                         {
                             maxWidth: isCompactLayout
                                 ? Math.min(width, isSmallScreen ? 420 : width)
-                                : Math.floor(width * 0.45),
+                                : isInGame
+                                    ? Math.floor(width * 0.26)
+                                    : Math.floor(width * 0.36),
                             padding: isSmallScreen
                                 ? Math.max(6, panelVerticalPadding - 3)
                                 : panelVerticalPadding,
@@ -1535,258 +1579,70 @@ export default function App() {
                                 </Pressable>
                             </>
                         ) : (
-                            useCompactInGameMenu ? (
+                            <>
                                 <View
                                     style={[
-                                        styles.inGameCompactRow,
-                                        { marginTop: lineSpacing * 1.5, gap: lineSpacing },
+                                        styles.collapsedMenuActions,
+                                        {
+                                            marginTop: lineSpacing * 1.5,
+                                            gap: lineSpacing,
+                                        },
                                     ]}
                                 >
-                                    <View style={styles.inGameCompactStatusCol}>
-                                        <Text style={[styles.cornerSub, { fontSize: subFontSize }]}>
-                                            Partie {playMode === "local" ? "locale" : "remote"}
-                                        </Text>
-                                        <Text
-                                            style={[
-                                                styles.cornerSub,
-                                                { fontSize: subFontSize, marginTop: lineSpacing },
-                                            ]}
-                                        >
-                                            {syncMessage}
-                                        </Text>
-                                        {waitingPlayersMessage ? (
-                                            <Text
-                                                style={[
-                                                    styles.cornerSub,
-                                                    {
-                                                        fontSize: subFontSize,
-                                                        marginTop: lineSpacing,
-                                                        color: "#fbbf24",
-                                                    },
-                                                ]}
-                                            >
-                                                {waitingPlayersMessage}
-                                            </Text>
-                                        ) : null}
-                                    </View>
-                                    <View style={styles.inGameCompactButtonsCol}>
-                                        <View
-                                            style={[
-                                                styles.zoomControlRow,
-                                                { marginBottom: lineSpacing },
-                                            ]}
-                                        >
-                                            <Pressable
-                                                style={styles.zoomButton}
-                                                onPress={() =>
-                                                    setBoardZoom((previous) =>
-                                                        clamp(previous - 0.1, 0.75, 1.8),
-                                                    )
-                                                }
-                                            >
-                                                <Text style={styles.zoomButtonText}>-</Text>
-                                            </Pressable>
-                                            <Pressable
-                                                style={styles.zoomValueButton}
-                                                onPress={() => setBoardZoom(1)}
-                                            >
-                                                <Text style={styles.zoomValueText}>
-                                                    {zoomPercent}%
-                                                </Text>
-                                            </Pressable>
-                                            <Pressable
-                                                style={styles.zoomButton}
-                                                onPress={() =>
-                                                    setBoardZoom((previous) =>
-                                                        clamp(previous + 0.1, 0.75, 1.8),
-                                                    )
-                                                }
-                                            >
-                                                <Text style={styles.zoomButtonText}>+</Text>
-                                            </Pressable>
-                                        </View>
+                                    <Text style={[styles.cornerSub, { fontSize: subFontSize }]}>
+                                        {syncMessage}
+                                    </Text>
+                                    <View style={styles.visibilityRow}>
                                         {canUseRemote ? (
                                             <Pressable
                                                 style={[
                                                     styles.menuButtonSecondary,
-                                                    styles.inGameCompactButton,
-                                                    {
-                                                        paddingVertical: Math.max(
-                                                            5,
-                                                            resetButtonVerticalPadding - 2,
-                                                        ),
-                                                        paddingHorizontal: Math.max(
-                                                            8,
-                                                            resetButtonHorizontalPadding - 2,
-                                                        ),
-                                                        borderRadius: clamp(
-                                                            Math.floor(panelRadius * 0.65),
-                                                            5,
-                                                            9,
-                                                        ),
-                                                        opacity: supabaseConfigured ? 1 : 0.5,
-                                                    },
+                                                    styles.collapsedActionButton,
+                                                    { opacity: supabaseConfigured ? 1 : 0.5 },
                                                 ]}
                                                 onPress={onSyncRemote}
                                                 disabled={!supabaseConfigured}
                                             >
-                                                <Text
-                                                    style={[
-                                                        styles.resetText,
-                                                        { fontSize: buttonFontSize },
-                                                    ]}
-                                                >
-                                                    ⟳ Sync
-                                                </Text>
+                                                <Text style={styles.resetText}>⟳ Sync</Text>
                                             </Pressable>
                                         ) : null}
                                         <Pressable
                                             style={[
                                                 styles.resetButton,
-                                                styles.inGameCompactButton,
-                                                {
-                                                    marginTop: lineSpacing,
-                                                    paddingVertical: Math.max(
-                                                        5,
-                                                        resetButtonVerticalPadding - 2,
-                                                    ),
-                                                    paddingHorizontal: Math.max(
-                                                        8,
-                                                        resetButtonHorizontalPadding - 2,
-                                                    ),
-                                                    borderRadius: clamp(
-                                                        Math.floor(panelRadius * 0.65),
-                                                        5,
-                                                        9,
-                                                    ),
-                                                },
+                                                styles.collapsedActionButton,
+                                                { marginLeft: canUseRemote ? lineSpacing : 0 },
                                             ]}
                                             onPress={onQuitGame}
                                         >
-                                            <Text
-                                                style={[
-                                                    styles.resetText,
-                                                    { fontSize: buttonFontSize },
-                                                ]}
-                                            >
-                                                ⏹ Quitter
-                                            </Text>
+                                            <Text style={styles.resetText}>⏹ Quitter</Text>
                                         </Pressable>
                                     </View>
+                                    {waitingPlayersMessage ? (
+                                        <Text
+                                            style={[
+                                                styles.cornerSub,
+                                                { fontSize: subFontSize, color: "#fbbf24" },
+                                            ]}
+                                        >
+                                            {waitingPlayersMessage}
+                                        </Text>
+                                    ) : null}
                                 </View>
-                            ) : (
-                                <>
+                                {!useCompactInGameMenu ? (
                                     <Text
                                         style={[
                                             styles.cornerSub,
                                             {
                                                 fontSize: subFontSize,
-                                                marginTop: lineSpacing * 2,
-                                            },
-                                        ]}
-                                    >
-                                        Partie en cours ({playMode === "local" ? "locale" : "remote"})
-                                    </Text>
-                                    {canUseRemote ? (
-                                        <Pressable
-                                            style={[
-                                                styles.menuButtonSecondary,
-                                                {
-                                                    marginTop: lineSpacing,
-                                                    paddingVertical: resetButtonVerticalPadding,
-                                                    paddingHorizontal:
-                                                        resetButtonHorizontalPadding,
-                                                    borderRadius: clamp(
-                                                        Math.floor(panelRadius * 0.7),
-                                                        5,
-                                                        10,
-                                                    ),
-                                                    opacity: supabaseConfigured ? 1 : 0.5,
-                                                },
-                                            ]}
-                                            onPress={onSyncRemote}
-                                            disabled={!supabaseConfigured}
-                                        >
-                                            <Text
-                                                style={[
-                                                    styles.resetText,
-                                                    { fontSize: buttonFontSize },
-                                                ]}
-                                            >
-                                                {isSmallScreen ? "⟳ Sync" : "Synchroniser"}
-                                            </Text>
-                                        </Pressable>
-                                    ) : null}
-                                    <Pressable
-                                        style={[
-                                            styles.resetButton,
-                                            {
                                                 marginTop: lineSpacing,
-                                                paddingVertical: resetButtonVerticalPadding,
-                                                paddingHorizontal:
-                                                    resetButtonHorizontalPadding,
-                                                borderRadius: clamp(
-                                                    Math.floor(panelRadius * 0.7),
-                                                    5,
-                                                    10,
-                                                ),
                                             },
                                         ]}
-                                        onPress={onQuitGame}
                                     >
-                                        <Text
-                                            style={[
-                                                styles.resetText,
-                                                { fontSize: buttonFontSize },
-                                            ]}
-                                        >
-                                            {isSmallScreen ? "⏹ Quitter" : "Quitter la partie"}
-                                        </Text>
-                                    </Pressable>
-                                </>
-                            )
+                                        Game ID: {remoteGameId ?? "aucun"}
+                                    </Text>
+                                ) : null}
+                            </>
                         )}
-
-                        {!useCompactInGameMenu ? (
-                            <Text
-                                style={[
-                                    styles.cornerSub,
-                                    {
-                                        fontSize: subFontSize,
-                                        marginTop: lineSpacing * 2,
-                                    },
-                                ]}
-                            >
-                                {syncMessage}
-                            </Text>
-                        ) : null}
-                        {!useCompactInGameMenu && waitingPlayersMessage ? (
-                            <Text
-                                style={[
-                                    styles.cornerSub,
-                                    {
-                                        fontSize: subFontSize,
-                                        marginTop: lineSpacing,
-                                        color: "#fbbf24",
-                                    },
-                                ]}
-                            >
-                                {waitingPlayersMessage}
-                            </Text>
-                        ) : null}
-                        {!useCompactInGameMenu ? (
-                            <Text
-                                style={[
-                                    styles.cornerSub,
-                                    {
-                                        fontSize: subFontSize,
-                                        marginTop: lineSpacing,
-                                    },
-                                ]}
-                            >
-                                Game ID: {remoteGameId ?? "aucun"}
-                            </Text>
-                        ) : null}
                         {!supabaseConfigured ? (
                             <Text
                                 style={[
@@ -1819,9 +1675,14 @@ export default function App() {
                                         {
                                             width: boardSize,
                                             height: boardSize,
-                                            transform: [{ scale: boardZoom }],
+                                            transform: [
+                                                { translateX: boardPan.x },
+                                                { translateY: boardPan.y },
+                                                { scale: boardZoom },
+                                            ],
                                         },
                                     ]}
+                                    {...(isSmallScreen ? boardPanResponder.panHandlers : {})}
                                 >
                                     <View
                                         style={[
@@ -2089,7 +1950,10 @@ export default function App() {
                                     </Pressable>
                                     <Pressable
                                         style={styles.mobileZoomValue}
-                                        onPress={() => setBoardZoom(1)}
+                                        onPress={() => {
+                                            setBoardZoom(1);
+                                            setBoardPan({ x: 0, y: 0 });
+                                        }}
                                     >
                                         <Text style={styles.mobileZoomValueText}>
                                             {zoomPercent}%
@@ -2136,23 +2000,23 @@ export default function App() {
 const styles = StyleSheet.create({
     page: {
         flex: 1,
-        backgroundColor: "#111827",
+        backgroundColor: "#0f172a",
     },
     layoutRoot: {
         flex: 1,
         flexDirection: "row",
     },
     sidebar: {
-        backgroundColor: "#0b1325",
+        backgroundColor: "rgba(2, 6, 23, 0.7)",
         borderRightWidth: 1,
-        borderRightColor: "rgba(255, 255, 255, 0.12)",
+        borderRightColor: "rgba(148, 163, 184, 0.18)",
         flexShrink: 0,
         alignSelf: "stretch",
     },
     menuPanel: {
-        backgroundColor: "rgba(17, 24, 39, 0.92)",
+        backgroundColor: "rgba(15, 23, 42, 0.78)",
         borderWidth: 1,
-        borderColor: "rgba(255, 255, 255, 0.15)",
+        borderColor: "rgba(148, 163, 184, 0.22)",
     },
     stage: {
         flex: 1,
@@ -2184,9 +2048,9 @@ const styles = StyleSheet.create({
     },
     cornerPanel: {
         flex: 1,
-        backgroundColor: "rgba(17, 24, 39, 0.86)",
+        backgroundColor: "rgba(15, 23, 42, 0.76)",
         borderWidth: 1,
-        borderColor: "rgba(255, 255, 255, 0.15)",
+        borderColor: "rgba(148, 163, 184, 0.2)",
         justifyContent: "center",
     },
     cornerOverlayPanel: {
@@ -2240,28 +2104,22 @@ const styles = StyleSheet.create({
         flexShrink: 1,
     },
     resetButton: {
-        backgroundColor: "#2563eb",
+        backgroundColor: "#1d4ed8",
     },
     menuButtonSecondary: {
-        backgroundColor: "#374151",
+        backgroundColor: "rgba(51, 65, 85, 0.9)",
     },
     visibilityRow: {
         flexDirection: "row",
     },
-    inGameCompactRow: {
-        flexDirection: "row",
-        alignItems: "flex-start",
+    collapsedMenuActions: {
+        gap: 6,
     },
-    inGameCompactStatusCol: {
+    collapsedActionButton: {
         flex: 1,
-        minWidth: 0,
-    },
-    inGameCompactButtonsCol: {
-        width: 120,
-        alignItems: "stretch",
-    },
-    inGameCompactButton: {
-        minHeight: 0,
+        borderRadius: 8,
+        paddingVertical: 7,
+        paddingHorizontal: 9,
     },
     usernameInput: {
         backgroundColor: "#1f2937",
@@ -2275,7 +2133,7 @@ const styles = StyleSheet.create({
     },
     visibilityButton: {
         flex: 1,
-        backgroundColor: "#1f2937",
+        backgroundColor: "rgba(30, 41, 59, 0.9)",
         borderWidth: 1,
         borderColor: "rgba(148, 163, 184, 0.4)",
         borderRadius: 6,
@@ -2283,8 +2141,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
     },
     visibilityButtonActive: {
-        backgroundColor: "#2563eb",
-        borderColor: "#60a5fa",
+        backgroundColor: "#1d4ed8",
+        borderColor: "#93c5fd",
     },
     visibilityText: {
         color: "#e5e7eb",
@@ -2293,7 +2151,7 @@ const styles = StyleSheet.create({
     },
     joinColorButton: {
         minWidth: 74,
-        backgroundColor: "#1f2937",
+        backgroundColor: "rgba(30, 41, 59, 0.9)",
         borderWidth: 1,
         borderColor: "rgba(148, 163, 184, 0.4)",
         borderRadius: 6,
