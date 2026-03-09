@@ -199,8 +199,10 @@ language plpgsql
 as $$
 declare
   join_context boolean := coalesce(current_setting('app.chess_join', true), '') = 'on';
+  leave_context boolean := coalesce(current_setting('app.chess_leave', true), '') = 'on';
   join_instance_id text := nullif(coalesce(current_setting('app.chess_instance', true), ''), '');
   join_username text := nullif(coalesce(current_setting('app.chess_username', true), ''), '');
+  leave_username text := nullif(coalesce(current_setting('app.chess_username', true), ''), '');
   slot text;
   old_value text;
   new_value text;
@@ -309,6 +311,81 @@ begin
       end if;
       if changed_username_slots <> 1 then
         raise exception 'Join must record exactly one seat username';
+      end if;
+    elsif leave_context then
+      if new.visibility <> old.visibility then
+        raise exception 'Visibility is immutable';
+      end if;
+
+      if new.fen <> old.fen or new.pgn <> old.pgn or new.turn <> old.turn or new.status <> old.status then
+        raise exception 'Leave can only update player assignment';
+      end if;
+
+      foreach slot in array array['white', 'red', 'black', 'blue'] loop
+        old_value := old.player_ids ->> slot;
+        new_value := new.player_ids ->> slot;
+        old_instance := old.player_instances ->> slot;
+        new_instance := new.player_instances ->> slot;
+        old_username := old.player_usernames ->> slot;
+        new_username := new.player_usernames ->> slot;
+
+        if old_value is distinct from new_value then
+          changed_user_slots := changed_user_slots + 1;
+          if changed_slot is null then
+            changed_slot := slot;
+          elsif changed_slot <> slot then
+            raise exception 'Leave must update one seat only';
+          end if;
+          if leave_username is null then
+            raise exception 'Leave username required';
+          end if;
+          if old_value <> leave_username then
+            raise exception 'Leave can only clear current username seat';
+          end if;
+          if new_value is not null then
+            raise exception 'Leave must clear player id';
+          end if;
+        end if;
+
+        if old_instance is distinct from new_instance then
+          changed_instance_slots := changed_instance_slots + 1;
+          if changed_slot is null then
+            changed_slot := slot;
+          elsif changed_slot <> slot then
+            raise exception 'Leave must update one seat only';
+          end if;
+          if new_instance is not null then
+            raise exception 'Leave must clear player instance';
+          end if;
+        end if;
+
+        if old_username is distinct from new_username then
+          changed_username_slots := changed_username_slots + 1;
+          if changed_slot is null then
+            changed_slot := slot;
+          elsif changed_slot <> slot then
+            raise exception 'Leave must update one seat only';
+          end if;
+          if leave_username is null then
+            raise exception 'Leave username required';
+          end if;
+          if old_username <> leave_username then
+            raise exception 'Leave can only clear current username seat';
+          end if;
+          if new_username is not null then
+            raise exception 'Leave must clear player username';
+          end if;
+        end if;
+      end loop;
+
+      if changed_user_slots <> 1 then
+        raise exception 'Leave must clear exactly one seat';
+      end if;
+      if changed_instance_slots <> 1 then
+        raise exception 'Leave must clear exactly one seat instance';
+      end if;
+      if changed_username_slots <> 1 then
+        raise exception 'Leave must clear exactly one seat username';
       end if;
     else
       if new.visibility <> old.visibility then
@@ -462,6 +539,80 @@ end;
 $$;
 
 grant execute on function public.join_chess_game(uuid, text, text, text) to authenticated;
+
+drop function if exists public.leave_chess_game(uuid, text);
+
+create or replace function public.leave_chess_game(
+  p_game_id uuid,
+  p_username text default null
+)
+returns table (
+  id uuid,
+  player_ids jsonb,
+  left_color text,
+  has_left boolean
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  current_user_id uuid := auth.uid();
+  current_username text := lower(regexp_replace(trim(coalesce(p_username, '')), '[^a-zA-Z0-9_-]', '', 'g'));
+  game_row public.chess_games%rowtype;
+begin
+  if current_user_id is null then
+    raise exception 'Authentication required';
+  end if;
+  if current_username is null or length(current_username) = 0 then
+    raise exception 'Username required';
+  end if;
+  if length(current_username) > 32 then
+    current_username := left(current_username, 32);
+  end if;
+
+  select * into game_row
+  from public.chess_games
+  where chess_games.id = p_game_id
+  for update;
+
+  if not found then
+    raise exception 'Game not found';
+  end if;
+
+  left_color := (
+    select players.slot
+    from jsonb_each_text(game_row.player_usernames) as players(slot, username)
+    where players.username = current_username
+    limit 1
+  );
+
+  if left_color is null then
+    id := game_row.id;
+    player_ids := game_row.player_ids;
+    has_left := false;
+    return next;
+    return;
+  end if;
+
+  perform set_config('app.chess_leave', 'on', true);
+  perform set_config('app.chess_username', current_username, true);
+
+  update public.chess_games
+  set player_ids = game_row.player_ids - left_color,
+      player_instances = game_row.player_instances - left_color,
+      player_usernames = game_row.player_usernames - left_color,
+      updated_at = now()
+  where chess_games.id = game_row.id
+  returning chess_games.id, chess_games.player_ids
+  into id, player_ids;
+
+  has_left := true;
+  return next;
+end;
+$$;
+
+grant execute on function public.leave_chess_game(uuid, text) to authenticated;
 
 create policy "Allow multiplayer read chess games"
 on public.chess_games

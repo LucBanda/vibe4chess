@@ -458,4 +458,38 @@ export async function deleteRemoteGame(gameId) {
     }
 }
 
+export async function leaveRemoteGame(gameId, username = null) {
+    await ensureAuthenticatedUserId();
+    const trimmedGameId = gameId?.trim();
+    if (!trimmedGameId) {
+        throw new Error("Game ID requis pour quitter une partie.");
+    }
+    const normalizedUsername = normalizeUsername(username, "");
+    if (!normalizedUsername) {
+        throw new Error("Pseudo requis pour quitter une partie.");
+    }
+
+    const rpcPayload = {
+        p_game_id: trimmedGameId,
+        p_username: normalizedUsername,
+    };
+    const { data, error } = await supabase.rpc("leave_chess_game", rpcPayload);
+
+    if (error) {
+        throw new Error(
+            `Sortie de partie impossible: ${error.message}. Vérifie la fonction leave_chess_game dans supabase/schema.sql.`,
+        );
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row?.id) {
+        throw new Error("Sortie de partie impossible: réponse Supabase invalide.");
+    }
+
+    return {
+        ...row,
+        hasLeftSeat: Boolean(row.has_left),
+    };
+}
+
 export { supabaseConfigured };

@@ -46,6 +46,7 @@ import {
     fetchPlayerStatus,
     fetchRemoteGame,
     getAuthenticatedUserId,
+    leaveRemoteGame,
     joinRemoteGame,
     listJoinableGames,
     isRemoteGameNotFoundError,
@@ -893,6 +894,17 @@ export default function App() {
             clearRemoteResumeState();
         }
         if (isRemoteSession && remoteGameId) {
+            const username = normalizeUsername(playerUsername, "");
+            if (!isRemoteOwner && username) {
+                try {
+                    const leaveResult = await leaveRemoteGame(remoteGameId, username);
+                    if (leaveResult?.updated_at) {
+                        setRemoteUpdatedAt(leaveResult.updated_at);
+                    }
+                } catch (error) {
+                    console.error("Remote leave seat failed", error);
+                }
+            }
             setPendingRemoteResume({
                 gameId: remoteGameId,
                 sessionMode:
@@ -1260,6 +1272,7 @@ export default function App() {
         let cancelled = false;
         let unsubscribe = null;
         let pullIntervalId = null;
+        let pullIntervalMs = null;
 
         const applyRemoteSnapshot = (remoteGame, source = "realtime") => {
             const nextUpdatedAt = remoteGame?.updated_at ?? null;
@@ -1298,10 +1311,29 @@ export default function App() {
             }
         };
 
+        const ensurePolling = (intervalMs = 1200) => {
+            if (pullIntervalId && pullIntervalMs === intervalMs) {
+                return;
+            }
+            if (pullIntervalId) {
+                clearInterval(pullIntervalId);
+            }
+            pullIntervalMs = intervalMs;
+            pullIntervalId = setInterval(() => {
+                void pullInitialRemoteState();
+            }, intervalMs);
+        };
+        const stopPolling = () => {
+            if (!pullIntervalId) {
+                return;
+            }
+            clearInterval(pullIntervalId);
+            pullIntervalId = null;
+            pullIntervalMs = null;
+        };
+
         void pullInitialRemoteState();
-        pullIntervalId = setInterval(() => {
-            void pullInitialRemoteState();
-        }, 1200);
+        ensurePolling(1200);
 
         try {
             unsubscribe = subscribeRemoteGame(remoteGameId, {
@@ -1310,12 +1342,15 @@ export default function App() {
                         return;
                     }
                     if (status === "SUBSCRIBED") {
+                        void pullInitialRemoteState();
+                        ensurePolling(5000);
                         setSyncMessage("Remote: abonnement temps réel actif");
                     } else if (
                         status === "CHANNEL_ERROR" ||
                         status === "TIMED_OUT" ||
                         status === "CLOSED"
                     ) {
+                        ensurePolling(1200);
                         setSyncMessage("Remote: fallback polling actif");
                     }
                 },
@@ -1336,13 +1371,13 @@ export default function App() {
             });
         } catch (error) {
             console.error("Remote realtime subscribe failed", error);
+            ensurePolling(1200);
+            setSyncMessage("Remote: fallback polling actif");
         }
 
         return () => {
             cancelled = true;
-            if (pullIntervalId) {
-                clearInterval(pullIntervalId);
-            }
+            stopPolling();
             if (typeof unsubscribe === "function") {
                 void unsubscribe();
             }
@@ -2824,7 +2859,7 @@ const styles = StyleSheet.create({
     },
     inGameTopActions: {
         // width: "100%",
-        flexshrink: 1,
+        flexShrink: 1,
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",

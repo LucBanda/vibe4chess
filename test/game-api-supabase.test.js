@@ -335,3 +335,45 @@ test("deleteRemoteGame trims id and propagates delete errors", async () => {
   h.next.delete.push({ error: { message: "forbidden" } });
   await assert.rejects(gameApi.deleteRemoteGame("game-del-2"), /Suppression impossible/);
 });
+
+test("leaveRemoteGame clears the caller seat when present", async () => {
+  const h = makeHarness();
+  h.next.rpc.push({
+    data: [{
+      id: "game-leave",
+      player_ids: { red: "robot", black: "bob" },
+      left_color: "white",
+      has_left: true,
+    }],
+    error: null,
+  });
+
+  const result = await gameApi.leaveRemoteGame(" game-leave ", " Alice ");
+  assert.equal(result.hasLeftSeat, true);
+  assert.equal(result.id, "game-leave");
+
+  const rpcCall = h.calls.find(
+    (call) => call.op === "rpc" && call.name === "leave_chess_game",
+  );
+  assert.ok(rpcCall);
+  assert.deepEqual(rpcCall.payload, {
+    p_game_id: "game-leave",
+    p_username: "alice",
+  });
+});
+
+test("leaveRemoteGame skips update when caller has no seat", async () => {
+  const h = makeHarness();
+  h.next.rpc.push({
+    data: [{
+      id: "game-leave-none",
+      player_ids: { white: "eve", red: "robot" },
+      left_color: null,
+      has_left: false,
+    }],
+    error: null,
+  });
+
+  const result = await gameApi.leaveRemoteGame("game-leave-none", "alice");
+  assert.equal(result.hasLeftSeat, false);
+});
