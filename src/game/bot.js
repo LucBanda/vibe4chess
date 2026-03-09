@@ -81,6 +81,34 @@ function pawnAdvancement(piece, toX, toY) {
   return 12 - toX;
 }
 
+function kingMobility(board, color) {
+  const kingPos = findKingPosition(board, color);
+  if (!kingPos) return 0;
+  let mobility = 0;
+  for (let dy = -1; dy <= 1; dy += 1) {
+    for (let dx = -1; dx <= 1; dx += 1) {
+      if (dx === 0 && dy === 0) continue;
+      const nx = kingPos.x + dx;
+      const ny = kingPos.y + dy;
+      if (!isPlayable(nx, ny)) continue;
+      const occupant = board[keyOf(nx, ny)];
+      if (!occupant || occupant.player !== color) {
+        mobility += 1;
+      }
+    }
+  }
+  return mobility;
+}
+
+function totalOpponentKingMobility(board, owner) {
+  let total = 0;
+  for (const color of ["white", "red", "black", "blue"]) {
+    if (color === owner) continue;
+    total += kingMobility(board, color);
+  }
+  return total;
+}
+
 function attackedOpponentsCount(board, owner, fromX, fromY, piece) {
   const attackedColors = new Set();
   for (let toY = 0; toY < BOARD_SIZE; toY += 1) {
@@ -142,11 +170,17 @@ function scoreMove(state, piece, fromX, fromY, toX, toY) {
     return -10_000;
   }
 
+  const myMaterial = materialByPlayer(simulated.state.board)[state.turn];
   const simulatedMaterial = materialByPlayer(simulated.state.board);
   const opponentsByMaterial = Object.entries(simulatedMaterial)
     .filter(([player]) => player !== state.turn)
     .sort((a, b) => b[1] - a[1]);
   const leadingOpponent = opponentsByMaterial[0]?.[0] ?? null;
+  const weakestOpponentMaterial = opponentsByMaterial.at(-1)?.[1] ?? myMaterial;
+  // When we strongly dominate the weakest opponent, press harder.
+  const dominanceRatio = weakestOpponentMaterial > 0 ? myMaterial / weakestOpponentMaterial : 4;
+  const dominanceMultiplier = Math.min(dominanceRatio / 2, 2);
+
   const leaderPressureBonus =
     target && target.player === leadingOpponent ? (PIECE_VALUE[target.type] ?? 0) * 4 : 0;
   const kingCaptureBonus = target?.type === "king" ? 700 : 0;
@@ -159,15 +193,26 @@ function scoreMove(state, piece, fromX, fromY, toX, toY) {
     attackedOpponentsCount(simulated.state.board, state.turn, toX, toY, movedPiece) * 20;
   const checkBonus = countCheckedOpponentKings(simulated.state.board, state.turn) * 50;
 
+  // Reward moves that restrict opponent kings' escape squares.
+  const mobilityBefore = totalOpponentKingMobility(state.board, state.turn);
+  const mobilityAfter = totalOpponentKingMobility(simulated.state.board, state.turn);
+  const confinementBonus = Math.max(0, mobilityBefore - mobilityAfter) * 12 * dominanceMultiplier;
+
   const opponentCounterCapture = bestOpponentCaptureScore(
     simulated.state.board,
     state.turn,
   );
-  const counterPenalty = opponentCounterCapture * 9;
+  // Reduced multiplier (was 9): counter-capture risk is always present in
+  // multi-player chess and a high constant drag drowns out useful signal.
+  const counterPenalty = opponentCounterCapture * 5;
   const kingPosition = findKingPosition(simulated.state.board, state.turn);
+  // Reduce king-safety penalty proportionally when we dominate: a large
+  // material lead makes our own king safer.
+  const baseKingPenalty = 350;
+  const scaledKingPenalty = Math.round(baseKingPenalty / dominanceMultiplier);
   const kingInDangerPenalty =
     kingPosition && isSquareUnderThreat(simulated.state.board, state.turn, kingPosition.x, kingPosition.y)
-      ? 350
+      ? scaledKingPenalty
       : 0;
 
   return (
@@ -176,6 +221,7 @@ function scoreMove(state, piece, fromX, fromY, toX, toY) {
     centerScore +
     outcomeScore +
     checkBonus +
+    confinementBonus +
     pawnAdvancementBonus -
     kingInDangerPenalty -
     exposedPenalty -
