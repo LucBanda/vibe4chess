@@ -59,6 +59,28 @@ function findKingPosition(board, owner) {
   return null;
 }
 
+function countCheckedOpponentKings(board, owner) {
+  let count = 0;
+  for (const color of ["white", "red", "black", "blue"]) {
+    if (color === owner) {
+      continue;
+    }
+    const kingPos = findKingPosition(board, color);
+    if (kingPos && isSquareUnderThreat(board, color, kingPos.x, kingPos.y)) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function pawnAdvancement(piece, toX, toY) {
+  const base = piece.origin ?? piece.player;
+  if (base === "white") return 12 - toY;
+  if (base === "black") return toY - 1;
+  if (base === "red") return toX - 1;
+  return 12 - toX;
+}
+
 function attackedOpponentsCount(board, owner, fromX, fromY, piece) {
   const attackedColors = new Set();
   for (let toY = 0; toY < BOARD_SIZE; toY += 1) {
@@ -106,7 +128,8 @@ function bestOpponentCaptureScore(board, owner) {
 function scoreMove(state, piece, fromX, fromY, toX, toY) {
   const target = state.board[keyOf(toX, toY)];
   const captureScore = target ? (PIECE_VALUE[target.type] ?? 0) * 20 : 0;
-  const promotionScore = shouldPromote(piece, toX, toY) ? 25 : 0;
+  const promotionScore = shouldPromote(piece, toX, toY) ? 120 : 0;
+  const pawnAdvancementBonus = piece.type === "pawn" ? pawnAdvancement(piece, toX, toY) * 0.5 : 0;
   const centerScore = 8 - (Math.abs(6.5 - toX) + Math.abs(6.5 - toY)) * 0.3;
 
   let outcomeScore = 0;
@@ -133,7 +156,8 @@ function scoreMove(state, piece, fromX, fromY, toX, toY) {
   const threatCount = countSquareThreats(simulated.state.board, state.turn, toX, toY);
   const exposedPenalty = threatCount > 0 ? movedPieceValue * (9 + threatCount * 4) : 0;
   const forkBonus =
-    attackedOpponentsCount(simulated.state.board, state.turn, toX, toY, movedPiece) * 8;
+    attackedOpponentsCount(simulated.state.board, state.turn, toX, toY, movedPiece) * 20;
+  const checkBonus = countCheckedOpponentKings(simulated.state.board, state.turn) * 50;
 
   const opponentCounterCapture = bestOpponentCaptureScore(
     simulated.state.board,
@@ -143,14 +167,16 @@ function scoreMove(state, piece, fromX, fromY, toX, toY) {
   const kingPosition = findKingPosition(simulated.state.board, state.turn);
   const kingInDangerPenalty =
     kingPosition && isSquareUnderThreat(simulated.state.board, state.turn, kingPosition.x, kingPosition.y)
-      ? 85
+      ? 350
       : 0;
 
   return (
     captureScore +
     promotionScore +
     centerScore +
-    outcomeScore -
+    outcomeScore +
+    checkBonus +
+    pawnAdvancementBonus -
     kingInDangerPenalty -
     exposedPenalty -
     counterPenalty +
