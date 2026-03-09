@@ -589,8 +589,6 @@ export default function App() {
         initializeGame();
         setSyncMessage("Aucune partie en cours");
         setWaitingPlayersMessage(null);
-        setSelected(null);
-        setLastMove(null);
     };
 
     const handleRemoteGameDeleted = () => {
@@ -606,7 +604,6 @@ export default function App() {
             return;
         }
         initializeGame();
-        setTurn("white");
         setPlayMode("local");
         setRemoteGameId(null);
         setRemotePlayerIds({});
@@ -1497,12 +1494,11 @@ export default function App() {
                                     borderRadius: panelRadius,
                                     paddingHorizontal: panelHorizontalPadding,
                                     paddingVertical: panelVerticalPadding,
-                                    flex: !isInGame ? 1 : 0,
+                                    flex: 1,
                                     justifyContent: "flex-start",
                                 },
                             ]}
                         >
-                            {!isInGame ? (
                                 <View
                                     style={[
                                         styles.menuFlow,
@@ -2126,94 +2122,6 @@ export default function App() {
                                         ) : null}
                                     </View>
                                 </View>
-                            ) : (
-                                <>
-                                    <View
-                                        style={[
-                                            styles.collapsedMenuActions,
-                                            {
-                                                marginTop: 0,
-                                            },
-                                        ]}
-                                    >
-                                        <View style={styles.inGameTopActions}>
-                                            <View
-                                                style={[
-                                                    styles.remoteStatusBanner,
-                                                    canUseRemote &&
-                                                    waitingPlayersMessage
-                                                        ? styles.remoteStatusBannerWarning
-                                                        : null,
-                                                    !canUseRemote
-                                                        ? styles.remoteStatusBannerLocal
-                                                        : null,
-                                                ]}
-                                            >
-                                                <Text
-                                                    style={[
-                                                        styles.remoteStatusText,
-                                                        canUseRemote &&
-                                                        waitingPlayersMessage
-                                                            ? styles.remoteStatusWarning
-                                                            : null,
-                                                        !canUseRemote
-                                                            ? styles.remoteStatusTextLocal
-                                                            : null,
-                                                    ]}
-                                                    numberOfLines={1}
-                                                    ellipsizeMode="tail"
-                                                >
-                                                    {canUseRemote
-                                                        ? (waitingPlayersMessage ??
-                                                          "Tous les joueurs sont connectés")
-                                                        : "Mode local: partie en cours"}
-                                                </Text>
-                                            </View>
-                                            <Pressable
-                                                style={[
-                                                    styles.iconActionButton,
-                                                    styles.iconActionSync,
-                                                    {
-                                                        opacity:
-                                                            canUseRemote &&
-                                                            supabaseConfigured
-                                                                ? 1
-                                                                : 0.45,
-                                                    },
-                                                ]}
-                                                onPress={onSyncRemote}
-                                                disabled={
-                                                    !canUseRemote ||
-                                                    !supabaseConfigured
-                                                }
-                                            >
-                                                <Text
-                                                    style={
-                                                        styles.iconActionText
-                                                    }
-                                                >
-                                                    ↻
-                                                </Text>
-                                            </Pressable>
-                                            <Pressable
-                                                style={[
-                                                    styles.iconActionButton,
-                                                    styles.iconActionQuit,
-                                                ]}
-                                                onPress={onQuitGame}
-                                            >
-                                                <Text
-                                                    style={
-                                                        styles.iconActionText
-                                                    }
-                                                >
-                                                    ✕
-                                                </Text>
-                                            </Pressable>
-                                        </View>
-                                    </View>
-                                </>
-                            )}
                         </View>
                     </View>
                 ) : null}
@@ -2913,9 +2821,6 @@ const styles = StyleSheet.create({
     },
     visibilityRow: {
         flexDirection: "row",
-    },
-    collapsedMenuActions: {
-        gap: 0,
     },
     inGameTopActions: {
         // width: "100%",
