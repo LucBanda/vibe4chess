@@ -31,23 +31,6 @@ function parseKey(squareKey) {
   return { x, y };
 }
 
-function canCaptureSquare(board, piece, fromX, fromY, targetX, targetY) {
-  return isLegalMove(board, fromX, fromY, targetX, targetY, piece);
-}
-
-function isSquareUnderThreat(board, owner, squareX, squareY) {
-  for (const [squareKey, piece] of Object.entries(board)) {
-    if (piece.player === owner) {
-      continue;
-    }
-    const { x, y } = parseKey(squareKey);
-    if (canCaptureSquare(board, piece, x, y, squareX, squareY)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 function countSquareThreats(board, owner, squareX, squareY) {
   let threatCount = 0;
   for (const [squareKey, piece] of Object.entries(board)) {
@@ -55,11 +38,15 @@ function countSquareThreats(board, owner, squareX, squareY) {
       continue;
     }
     const { x, y } = parseKey(squareKey);
-    if (canCaptureSquare(board, piece, x, y, squareX, squareY)) {
+    if (isLegalMove(board, x, y, squareX, squareY, piece)) {
       threatCount += 1;
     }
   }
   return threatCount;
+}
+
+function isSquareUnderThreat(board, owner, squareX, squareY) {
+  return countSquareThreats(board, owner, squareX, squareY) > 0;
 }
 
 function findKingPosition(board, owner) {
